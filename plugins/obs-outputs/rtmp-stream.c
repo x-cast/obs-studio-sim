@@ -947,6 +947,36 @@ static bool rtmp_stream_start(void *data)
 		return false;
 
 	os_atomic_set_bool(&stream->connecting, true);
+
+	/* store initial bitrate for dynamical variable bitrate option */
+	obs_encoder_t *vencoder = obs_output_get_video_encoder(stream->output);
+	const char *encoder_id = obs_encoder_get_id(vencoder);
+	if (strcmp(encoder_id, "obs_x264") == 0)
+		blog(LOG_INFO, "the encoder is x264");
+	else
+		blog(LOG_INFO, "the encoder is unknown");
+	obs_data_t *params = obs_encoder_get_settings(vencoder);
+	if (params) {
+		int bitrate = obs_data_get_int(params, "bitrate");
+		stream->initial_bitrate = bitrate;
+		stream->dynamic_bitrate = bitrate;
+		stream->switch_variable_bitrate = obs_data_get_bool(params, "dynamic_variable_bitrate");
+		obs_data_release(params);
+	}
+	else {
+		stream->initial_bitrate = 2500;
+		stream->dynamic_bitrate = 2500;
+		stream->switch_variable_bitrate = false;
+	}
+	stream->last_adjustment_time = os_gettime_ns() / 1000000;
+	stream->last_congestion = 0;
+	stream->congestion_counter = 0;
+	stream->mean_congestion = 0;
+	size_t count;
+	for (count = 0; count < CONGESTION_ARRAY_SIZE; count++) {
+		stream->congestion_array[count] = 0;
+	}
+
 	return pthread_create(&stream->connect_thread, NULL, connect_thread,
 			stream) == 0;
 }
@@ -1065,11 +1095,76 @@ static void check_to_drop_frames(struct rtmp_stream *stream, bool pframes)
 	}
 }
 
+/* dynamic variable bitrate */
+float find_maximum(float a[], int n) {
+	int c, max;
+	max = a[0];
+	for (c = 1; c < n; c++) {
+		if (a[c] > max)
+			max = a[c];
+	}
+	return max;
+}
+
+static void adjust_bitrate(struct rtmp_stream *stream)
+{
+	obs_encoder_t *vencoder = obs_output_get_video_encoder(stream->output);
+	const char *encoder_id = obs_encoder_get_id(vencoder);
+	obs_data_t *params = obs_encoder_get_settings(vencoder);
+	int i_nal_hrd = obs_data_get_int(params, "i_nal_hrd");
+	uint64_t cur_time_ms = os_gettime_ns() / 1000000;
+	uint64_t last_adjustment_time = stream->last_adjustment_time;
+	float congestion = stream->congestion;
+	size_t counter = stream->congestion_counter;
+	stream->mean_congestion = stream->mean_congestion + (congestion - stream->congestion_array[counter]) / CONGESTION_ARRAY_SIZE;
+	float mean_congestion = stream->mean_congestion;
+	stream->congestion_array[counter] = congestion;
+	stream->congestion_counter = ( stream->congestion_counter + 1 ) % CONGESTION_ARRAY_SIZE;
+	float max_congestion = find_maximum(stream->congestion_array, CONGESTION_ARRAY_SIZE);
+
+	float last_congestion = stream->last_congestion;
+	int current_bitrate = stream->dynamic_bitrate;
+	int initial_bitrate = stream->initial_bitrate;
+
+	// X264_NAL_HRD_CBR=2 incompatible with dynamic variable bitrate
+	if ( (strcmp(encoder_id, "obs_x264") == 0) && i_nal_hrd != 2 &&
+		stream->switch_variable_bitrate) {
+		if (congestion > 0.25 && current_bitrate > (initial_bitrate / 2) && (cur_time_ms - last_adjustment_time) > 1500) {
+			current_bitrate = (int)(current_bitrate / 1.1);
+			if (current_bitrate < (initial_bitrate / 2))
+				current_bitrate = initial_bitrate / 2;
+			stream->dynamic_bitrate = current_bitrate;
+			int previous_bitrate = obs_data_get_int(params, "bitrate");
+			obs_data_set_int(params, "bitrate", current_bitrate);
+			obs_encoder_update(vencoder, params);
+			blog(LOG_INFO, "Congestion detected %f percent, dropping bitrate from %i kbps  to %i kbps", congestion * 100, previous_bitrate, current_bitrate);
+			stream->last_adjustment_time = cur_time_ms;
+		}
+
+		if ((mean_congestion < 0.05 || max_congestion < 0.15) && congestion < 0.05 && last_congestion < 0.05 && current_bitrate < initial_bitrate && (cur_time_ms - last_adjustment_time) > 5000) {
+			current_bitrate = (int)(current_bitrate * 1.10);
+			if (current_bitrate > initial_bitrate)
+				current_bitrate = initial_bitrate;
+			stream->dynamic_bitrate = current_bitrate;
+			int previous_bitrate = obs_data_get_int(params, "bitrate");
+			obs_data_set_int(params, "bitrate", current_bitrate);
+			obs_encoder_update(vencoder, params);
+			blog(LOG_INFO, "Congestion clearing at %f percent, raising bitrate to %i kbps from previous bitrate %i kbps \n", congestion * 100, current_bitrate, previous_bitrate);
+			stream->last_adjustment_time = cur_time_ms;
+		}
+		stream->last_congestion = congestion;
+	}
+
+}
+
 static bool add_video_packet(struct rtmp_stream *stream,
 		struct encoder_packet *packet)
 {
+	adjust_bitrate(stream);
 	check_to_drop_frames(stream, false);
 	check_to_drop_frames(stream, true);
+
+
 
 	/* if currently dropping frames, drop packets until it reaches the
 	 * desired priority */
@@ -1119,6 +1214,7 @@ static void rtmp_stream_data(void *data, struct encoder_packet *packet)
 		os_sem_post(stream->send_sem);
 	else
 		obs_encoder_packet_release(&new_packet);
+
 }
 
 static void rtmp_stream_defaults(obs_data_t *defaults)
