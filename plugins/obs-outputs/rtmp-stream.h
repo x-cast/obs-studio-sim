@@ -98,6 +98,7 @@ struct rtmp_stream {
 	float            mean_congestion;
 	float            congestion_array[CONGESTION_ARRAY_SIZE];
 	size_t           congestion_counter;
+	bool             disable_frame_drops;
 
 	RTMP             rtmp;
 
