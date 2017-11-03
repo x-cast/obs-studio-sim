@@ -961,14 +961,14 @@ static bool rtmp_stream_start(void *data)
 		stream->initial_bitrate = bitrate;
 		stream->dynamic_bitrate = bitrate;
 		stream->switch_variable_bitrate = obs_data_get_bool(params, "dynamic_variable_bitrate");
-		stream->disable_frame_drops = obs_data_get_bool(params, "disable_frame_drops");
+		stream->delay_frame_drops = obs_data_get_bool(params, "delay_frame_drops");
 		obs_data_release(params);
 	}
 	else {
 		stream->initial_bitrate = 2500;
 		stream->dynamic_bitrate = 2500;
 		stream->switch_variable_bitrate = false;
-		stream->disable_frame_drops = false;
+		stream->delay_frame_drops = false;
 	}
 	stream->last_adjustment_time = os_gettime_ns() / 1000000;
 	stream->last_congestion = 0;
@@ -1091,9 +1091,8 @@ static void check_to_drop_frames(struct rtmp_stream *stream, bool pframes)
 			(float)drop_threshold;
 	}
 
-	if (buffer_duration_usec > drop_threshold) {
+	if (buffer_duration_usec > (stream->delay_frame_drops? 80 :1 ) * drop_threshold) {
 		debug("buffer_duration_usec: %" PRId64, buffer_duration_usec);
-		if (!stream->disable_frame_drops)
 			drop_frames(stream, name, priority, pframes);
 	}
 }

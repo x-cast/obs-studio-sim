@@ -108,7 +108,7 @@ static void obs_x264_defaults(obs_data_t *settings)
 	obs_data_set_default_string(settings, "tune",        "");
 	obs_data_set_default_string(settings, "x264opts",    "");
 	obs_data_set_default_bool  (settings, "dynamic_variable_bitrate", false);
-	obs_data_set_default_bool  (settings, "disable_frame_drops", false);
+	obs_data_set_default_bool  (settings, "delay_frame_drops", false);
 	obs_data_set_default_int   (settings, "i_nal_hrd", X264_NAL_HRD_NONE);
 }
 
@@ -133,7 +133,7 @@ static inline void add_strings(obs_property_t *list, const char *const *strings)
 #define TEXT_NONE       obs_module_text("None")
 #define TEXT_X264_OPTS  obs_module_text("EncoderOptions")
 #define TEXT_DYN_BITRATE obs_module_text("Dynamic Variable Bitrate")
-#define TEXT_DIS_DROP   obs_module_text("Disable Frame Drops")
+#define TEXT_DIS_DROP   obs_module_text("Delay Frame Drops")
 
 static bool use_bufsize_modified(obs_properties_t *ppts, obs_property_t *p,
 		obs_data_t *settings)

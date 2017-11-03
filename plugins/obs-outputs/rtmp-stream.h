@@ -30,7 +30,7 @@
 #define OPT_BIND_IP "bind_ip"
 #define OPT_NEWSOCKETLOOP_ENABLED "new_socket_loop_enabled"
 #define OPT_LOWLATENCY_ENABLED "low_latency_mode_enabled"
-#define CONGESTION_ARRAY_SIZE 300
+#define CONGESTION_ARRAY_SIZE 300 // about 10 sec
 //#define TEST_FRAMEDROPS
 
 #ifdef TEST_FRAMEDROPS
@@ -98,7 +98,7 @@ struct rtmp_stream {
 	float            mean_congestion;
 	float            congestion_array[CONGESTION_ARRAY_SIZE];
 	size_t           congestion_counter;
-	bool             disable_frame_drops;
+	bool             delay_frame_drops;
 
 	RTMP             rtmp;
 
