@@ -32,8 +32,17 @@ enum _audio_repack_mode {
 	repack_mode_8to6ch,
 	repack_mode_8to5ch_swap,
 	repack_mode_8to6ch_swap,
+	repack_mode_8to7ch,
+	repack_mode_8to7ch_swap,
 	repack_mode_8ch_swap,
 	repack_mode_8ch,
+	repack_mode_16to9ch,
+	repack_mode_16to10ch,
+	repack_mode_16to11ch,
+	repack_mode_16to12ch,
+	repack_mode_16to13ch,
+	repack_mode_16to14ch,
+	repack_mode_16to15ch,
 };
 
 typedef enum _audio_repack_mode audio_repack_mode_t;
