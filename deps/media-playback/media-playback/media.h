@@ -54,6 +54,7 @@ struct mp_media {
 	char *path;
 	char *format_name;
 	int buffering;
+	char *input_options;
 	int speed;
 
 	enum AVPixelFormat scale_format;
@@ -108,6 +109,7 @@ struct mp_media_info {
 	const char *path;
 	const char *format;
 	int buffering;
+	char *input_options;
 	int speed;
 	enum video_range_type force_range;
 	bool hardware_decoding;
