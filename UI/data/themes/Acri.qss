@@ -881,6 +881,7 @@ StreamCheckBox::indicator:unchecked:focus {
 	height: 16px;
 }
 
+
 RecCheckBox {
 	outline: none;
 }
@@ -911,6 +912,38 @@ RecCheckBox::indicator:unchecked:hover {
 
 RecCheckBox::indicator:unchecked:focus {
 	image: url(:/res/images/recOFF.png);
+}
+
+SendsCheckBox {
+	outline: none;
+}
+
+SendsCheckBox[themeID="MacOnly"] {
+	padding: 0px;
+}
+
+SendsCheckBox::indicator:checked {
+	image: url(:/res/images/sendsON.png);
+}
+
+SendsCheckBox::indicator:checked:hover {
+	image: url(:/res/images/sendsON.png);
+}
+
+SendsCheckBox::indicator:checked:focus {
+	image: url(:/res/images/sendsON.png);
+}
+
+SendsCheckBox::indicator:unchecked {
+	image: url(:/res/images/sendsOFF.png);
+}
+
+SendsCheckBox::indicator:unchecked:hover {
+	image: url(:/res/images/sendsOFF.png);
+}
+
+SendsCheckBox::indicator:unchecked:focus {
+	image: url(:/res/images/sendsOFF.png);
 }
 
 OBSHotkeyLabel[hotkeyPairHover=true] {

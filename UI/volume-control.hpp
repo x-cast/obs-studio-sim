@@ -230,6 +230,10 @@ class RecCheckBox : public QCheckBox {
 class MonCheckBox : public QCheckBox {
 	Q_OBJECT
 };
+class SendsCheckBox : public QCheckBox {
+	Q_OBJECT
+};
+
 class VolControl : public QWidget {
 	Q_OBJECT
 
@@ -244,6 +248,9 @@ private:
 	StreamCheckBox  *stream;
 	RecCheckBox     *rec;
 	MonCheckBox     *mon;
+	// The next checkbox controls whether monitoring_type is 'monitor only'
+	// or 'monitor and output'
+	SendsCheckBox   *send;
 	bool            *mutePtr;
 	QPushButton     *config = nullptr;
 	float           levelTotal;
@@ -259,16 +266,19 @@ private:
 		const float inputPeak[MAX_AUDIO_CHANNELS]);
 	static void OBSVolumeMuted(void *data, calldata_t *calldata);
 	static void OBSMonitoringEnabled(void *data, calldata_t *calldata);
+	static void OBSSend(void *data, calldata_t *calldata);
 
 	void EmitConfigClicked();
 
 private slots:
 	void VolumeMuted(bool muted);
 	void MonitoringEnabled(bool checked);
+	void SendEnabled(bool checked);
 	void SetMuted(bool checked);
 	void SetStream(bool checked);
 	void SetRec(bool checked);
 	void SetMon(bool checked);
+	void SetSends(bool checked);
 
 	void SliderChanged(int vol);
 	void updateText();
@@ -293,4 +303,5 @@ public:
 
 	void SetMeterDecayRate(qreal q);
 	void setPeakMeterType(enum obs_peak_meter_type peakMeterType);
+	void resetSends();
 };

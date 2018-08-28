@@ -2125,6 +2125,7 @@ void OBSBasic::InitHotkeys()
 
 	obs_hotkeys_set_audio_hotkeys_translations(Str("Mute"), Str("Unmute"),
 			Str("Monitor"), Str("Unmonitor"),
+			Str("Send"), Str("Unsend"),
 			Str("Push-to-mute"), Str("Push-to-talk"));
 
 	obs_hotkeys_set_sceneitem_hotkeys_translations(

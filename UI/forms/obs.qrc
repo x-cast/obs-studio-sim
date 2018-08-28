@@ -34,6 +34,8 @@
     <file>images/recOFF.png</file>
     <file>images/monON.png</file>
     <file>images/monOFF.png</file>
+    <file>images/sendsON.png</file>
+    <file>images/sendsOFF.png</file>
   </qresource>
   <qresource prefix="/settings">
     <file>images/settings/output.svg</file>

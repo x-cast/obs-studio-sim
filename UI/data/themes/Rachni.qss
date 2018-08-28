@@ -878,6 +878,37 @@ RecCheckBox::indicator:unchecked:focus {
 	image: url(:/res/images/recOFF.png);
 }
 
+SendsCheckBox {
+	outline: none;
+}
+
+SendsCheckBox::indicator:checked {
+	image: url(:/res/images/sendsON.png);
+}
+
+SendsCheckBox::indicator:checked:hover {
+	background-color: rgba(240, 98, 146, 0.5); /* Pink (Secondary) */
+	image: url(:/res/images/sendsON.png);
+}
+
+SendsCheckBox::indicator:checked:focus {
+	image: url(:/res/images/sendsON.png);
+}
+
+SendsCheckBox::indicator:unchecked {
+	image: url(:/res/images/sendsOFF.png);
+}
+
+SendsCheckBox::indicator:unchecked:hover {
+	image: url(:/res/images/sendsOFF.png);
+}
+
+SendsCheckBox::indicator:unchecked:focus {
+	background-color: rgba(240, 98, 146, 0.5); /* Pink (Secondary) */
+	image: url(:/res/images/sendsOFF.png);
+}
+
+
 /****************************/
 /* --- Group Checkboxes --- */
 /****************************/
