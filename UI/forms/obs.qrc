@@ -28,6 +28,12 @@
     <file>images/dyn.png</file>
     <file>images/dyndown.png</file>
     <file>images/dynup.png</file>
+    <file>images/streamON.png</file>
+    <file>images/streamOFF.png</file>
+    <file>images/recON.png</file>
+    <file>images/recOFF.png</file>
+    <file>images/monON.png</file>
+    <file>images/monOFF.png</file>
   </qresource>
   <qresource prefix="/settings">
     <file>images/settings/output.svg</file>

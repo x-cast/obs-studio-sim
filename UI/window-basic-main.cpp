@@ -88,6 +88,8 @@ QCefCookieManager *panel_cookies = nullptr;
 
 void DestroyPanelCookieManager();
 
+#define SOURCE_IS_NOT_TRACK -1
+
 namespace {
 
 template <typename OBSRef>
@@ -327,6 +329,7 @@ OBSBasic::OBSBasic(QWidget *parent)
 
 	assignDockToggle(ui->scenesDock, ui->toggleScenes);
 	assignDockToggle(ui->sourcesDock, ui->toggleSources);
+	assignDockToggle(ui->mastermixerDock, ui->toggleMasterMixer);
 	assignDockToggle(ui->mixerDock, ui->toggleMixer);
 	assignDockToggle(ui->transitionsDock, ui->toggleTransitions);
 	assignDockToggle(ui->controlsDock, ui->toggleControls);
@@ -335,6 +338,7 @@ OBSBasic::OBSBasic(QWidget *parent)
 	//hide all docking panes
 	ui->toggleScenes->setChecked(false);
 	ui->toggleSources->setChecked(false);
+	ui->toggleMasterMixer->setChecked(false);
 	ui->toggleMixer->setChecked(false);
 	ui->toggleTransitions->setChecked(false);
 	ui->toggleControls->setChecked(false);
@@ -449,6 +453,9 @@ static obs_data_t *GenerateSaveData(obs_data_array_t *sceneOrder,
 	}, nullptr);
 
 	/* -------------------------------- */
+	/* save mix track sources */
+
+	obs_data_array_t * tracksArray = obs_save_track_sources();
 
 	obs_source_t *transition = obs_get_output_source(0);
 	obs_source_t *currentScene = obs_scene_get_source(scene);
@@ -463,12 +470,14 @@ static obs_data_t *GenerateSaveData(obs_data_array_t *sceneOrder,
 	obs_data_set_array(saveData, "scene_order", sceneOrder);
 	obs_data_set_string(saveData, "name", sceneCollection);
 	obs_data_set_array(saveData, "sources", sourcesArray);
+	obs_data_set_array(saveData, "tracks", tracksArray);
 	obs_data_set_array(saveData, "groups", groupsArray);
 	obs_data_set_array(saveData, "quick_transitions", quickTransitionData);
 	obs_data_set_array(saveData, "transitions", transitions);
 	obs_data_set_array(saveData, "saved_projectors", savedProjectorList);
 	obs_data_array_release(sourcesArray);
 	obs_data_array_release(groupsArray);
+	obs_data_array_release(tracksArray);
 
 	obs_data_set_string(saveData, "current_transition",
 			obs_source_get_name(transition));
@@ -503,33 +512,37 @@ void OBSBasic::UpdateVolumeControlsDecayRate()
 	double meterDecayRate = config_get_double(basicConfig, "Audio",
 			"MeterDecayRate");
 
-	for (size_t i = 0; i < volumes.size(); i++) {
-		volumes[i]->SetMeterDecayRate(meterDecayRate);
+	for (VolControl *volume : volumes)
+		volume->SetMeterDecayRate(meterDecayRate);
+	for (VolControl *volume : master_volumes)
+		volume->SetMeterDecayRate(meterDecayRate);
+}
+
+static enum obs_peak_meter_type GetPeakMeterType(uint64_t peakMeterTypeIdx)
+{
+	switch (peakMeterTypeIdx) {
+	case 1:
+		return TRUE_PEAK_METER;
+	default:
+		return SAMPLE_PEAK_METER;
 	}
 }
 
 void OBSBasic::UpdateVolumeControlsPeakMeterType()
 {
-	uint32_t peakMeterTypeIdx = config_get_uint(basicConfig, "Audio",
+	uint64_t peakMeterTypeIdx = config_get_uint(basicConfig, "Audio",
 			"PeakMeterType");
 
-	enum obs_peak_meter_type peakMeterType;
-	switch (peakMeterTypeIdx) {
-	case 0:
-		peakMeterType = SAMPLE_PEAK_METER;
-		break;
-	case 1:
-		peakMeterType = TRUE_PEAK_METER;
-		break;
-	default:
-		peakMeterType = SAMPLE_PEAK_METER;
-		break;
-	}
+	enum obs_peak_meter_type peakMeterType = GetPeakMeterType(
+			peakMeterTypeIdx);
 
-	for (size_t i = 0; i < volumes.size(); i++) {
-		volumes[i]->setPeakMeterType(peakMeterType);
-	}
+	for (VolControl *volume : volumes)
+		volume->setPeakMeterType(peakMeterType);
+
+	for (VolControl *volume : master_volumes)
+		volume->setPeakMeterType(peakMeterType);
 }
+
 
 void OBSBasic::ClearVolumeControls()
 {
@@ -537,6 +550,27 @@ void OBSBasic::ClearVolumeControls()
 		delete vol;
 
 	volumes.clear();
+}
+
+void OBSBasic::ClearMasterVolumeControls()
+{
+
+	obs_audio_mix_lock();
+	obs_volmeter_t **meters = (obs_volmeter_t **)obs_audio_mix_meters();
+	obs_fader_t **faders = (obs_fader_t **)obs_audio_mix_faders();
+
+	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+		meters[i] = nullptr;
+		faders[i] = nullptr;
+	}
+
+	for (VolControl *vol : master_volumes) {
+		delete vol;
+		vol = nullptr;
+	}
+
+	obs_audio_mix_unlock();
+	master_volumes.clear();
 }
 
 obs_data_array_t *OBSBasic::SaveSceneListOrder()
@@ -848,6 +882,7 @@ void OBSBasic::Load(const char *file)
 
 	obs_data_array_t *sceneOrder = obs_data_get_array(data, "scene_order");
 	obs_data_array_t *sources    = obs_data_get_array(data, "sources");
+	obs_data_array_t *tracks     = obs_data_get_array(data, "tracks");
 	obs_data_array_t *groups     = obs_data_get_array(data, "groups");
 	obs_data_array_t *transitions= obs_data_get_array(data, "transitions");
 	const char       *sceneName = obs_data_get_string(data,
@@ -897,6 +932,7 @@ void OBSBasic::Load(const char *file)
 		obs_data_array_push_back_array(sources, groups);
 	}
 
+	obs_load_track_sources(tracks, nullptr, nullptr);
 	obs_load_sources(sources, nullptr, nullptr);
 
 	if (transitions)
@@ -941,6 +977,7 @@ retryScene:
 	obs_source_release(curProgramScene);
 
 	obs_data_array_release(sources);
+	obs_data_array_release(tracks);
 	obs_data_array_release(groups);
 	obs_data_array_release(sceneOrder);
 
@@ -1806,10 +1843,15 @@ void OBSBasic::OBSInit()
 					QTStr("Basic.AutoConfig"), msg);
 		}
 	}
+	/* ----------------------- */
+	/* Add master mixer        */
+
+	InitAudioMasterMixer();
 
 	ToggleMixerLayout(config_get_bool(App()->GlobalConfig(), "BasicWindow",
-			"VerticalVolControl"));
-
+			"VerticalVolControl"), false);
+	ToggleMixerLayout(config_get_bool(App()->GlobalConfig(), "BasicWindow",
+			"VerticalMasterVolControl"), true);
 	if (config_get_bool(basicConfig, "General", "OpenStatsOnStartup"))
 		on_stats_triggered();
 
@@ -2082,6 +2124,7 @@ void OBSBasic::InitHotkeys()
 	obs_hotkeys_set_translations(&t);
 
 	obs_hotkeys_set_audio_hotkeys_translations(Str("Mute"), Str("Unmute"),
+			Str("Monitor"), Str("Unmonitor"),
 			Str("Push-to-mute"), Str("Push-to-talk"));
 
 	obs_hotkeys_set_sceneitem_hotkeys_translations(
@@ -2285,6 +2328,17 @@ OBSBasic::~OBSBasic()
 	 * can be freed, and we have no control over the destruction order of
 	 * the Qt UI stuff, so we have to manually clear any references to
 	 * libobs. */
+	ClearMasterVolumeControls();
+
+	obs_audio_mix_lock();
+	obs_source_t **tracks = (obs_source_t **)obs_audio_mix_tracks();
+	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+		if (tracks[i])
+			obs_source_release(tracks[i]);
+		tracks[i] = nullptr;
+	}
+	obs_audio_mix_unlock();
+
 	delete cpuUsageTimer;
 	os_cpu_usage_info_destroy(cpuUsageInfo);
 
@@ -2748,22 +2802,27 @@ void OBSBasic::HideAudioControl()
 
 	if (!SourceMixerHidden(source)) {
 		SetSourceMixerHidden(source, true);
-		DeactivateAudioSource(source);
+		if (obs_source_get_output_flags(source) & OBS_SOURCE_TRACK) {
+			InitAudioMasterMixer();
+		} else {
+			DeactivateAudioSource(source);
+		}
 	}
 }
 
 void OBSBasic::UnhideAllAudioControls()
 {
 	auto UnhideAudioMixer = [this] (obs_source_t *source) /* -- */
-	{
-		if (!obs_source_active(source))
-			return true;
-		if (!SourceMixerHidden(source))
-			return true;
+	{	if (!(obs_source_get_output_flags(source) & OBS_SOURCE_TRACK)) {
+			if (!obs_source_active(source))
+				return true;
+			if (!SourceMixerHidden(source))
+				return true;
 
-		SetSourceMixerHidden(source, false);
-		ActivateAudioSource(source);
-		return true;
+			SetSourceMixerHidden(source, false);
+			ActivateAudioSource(source);
+			return true;
+		}
 	};
 
 	using UnhideAudioMixer_t = decltype(UnhideAudioMixer);
@@ -2774,6 +2833,17 @@ void OBSBasic::UnhideAllAudioControls()
 	};
 
 	obs_enum_sources(PreEnum, &UnhideAudioMixer);
+}
+
+void OBSBasic::UnhideAllMasterAudioControls()
+{
+	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+		obs_data_t *private_settings =
+				obs_source_get_private_settings(master_volumes[i]->GetSource());
+		obs_data_set_bool(private_settings, "mixer_hidden", false);
+		master_volumes[i]->show();
+		obs_data_release(private_settings);
+	}
 }
 
 void OBSBasic::ToggleHideMixer()
@@ -2826,12 +2896,86 @@ void OBSBasic::MixerRenameSource()
 		}
 
 		obs_source_set_name(source, name.c_str());
+
+		if (obs_source_get_output_flags(source) & OBS_SOURCE_TRACK) {
+			int track_index = vol->GetTrack();
+			std::string trackNum = "Track" + std::to_string(track_index + 1) + "Name";
+			vol->setObjectName(QString::fromStdString(name));
+			OBSBasic *main = reinterpret_cast<OBSBasic*>(App()->GetMainWindow());
+			config_set_string(main->Config(), "AdvOut", trackNum.c_str(), name.c_str());
+			main->ResetOutputs();
+			config_save_safe(main->Config(), "tmp", nullptr);
+			InitAudioMasterMixer();
+		}
 		break;
 	}
 }
 
-void OBSBasic::VolControlContextMenu()
+void OBSBasic::MasterVolControlContextMenu()
 {
+	VolControl *vol = reinterpret_cast<VolControl*>(sender());
+
+	/* ------------------- */
+
+	QAction hideAction(QTStr("Hide"), this);
+	QAction unhideAllAction(QTStr("UnhideAll"), this);
+	QAction mixerRenameAction(QTStr("Rename"), this);
+	QAction filtersAction(QTStr("Filters"), this);
+	QAction advPropAction(QTStr("Basic.MainMenu.Edit.AdvAudio"), this);
+
+	QAction toggleControlLayoutAction(QTStr("VerticalLayoutMaster"), this);
+	toggleControlLayoutAction.setCheckable(true);
+	toggleControlLayoutAction.setChecked(config_get_bool(GetGlobalConfig(),
+			"BasicWindow", "VerticalMasterVolControl"));
+
+	/* ------------------- */
+
+	connect(&hideAction, &QAction::triggered,
+			this, &OBSBasic::HideAudioControl,
+			Qt::DirectConnection);
+	connect(&unhideAllAction, &QAction::triggered,
+			this, &OBSBasic::UnhideAllMasterAudioControls,
+			Qt::DirectConnection);
+	connect(&mixerRenameAction, &QAction::triggered,
+			this, &OBSBasic::MixerRenameSource,
+			Qt::DirectConnection);
+	connect(&filtersAction, &QAction::triggered,
+			this, &OBSBasic::GetAudioSourceFilters,
+			Qt::DirectConnection);
+	connect(&advPropAction, &QAction::triggered,
+			this, &OBSBasic::on_actionAdvAudioProperties_triggered,
+			Qt::DirectConnection);
+
+	/* ------------------- */
+
+	connect(&toggleControlLayoutAction, &QAction::changed, this,
+			&OBSBasic::ToggleMasterVolControlLayout,
+			Qt::DirectConnection);
+
+	/* ------------------- */
+
+	hideAction.setProperty("volControl",
+			QVariant::fromValue<VolControl*>(vol));
+	mixerRenameAction.setProperty("volControl",
+			QVariant::fromValue<VolControl*>(vol));
+	filtersAction.setProperty("volControl",
+			QVariant::fromValue<VolControl*>(vol));
+
+	/* ------------------- */
+
+	QMenu popup(this);
+	popup.addAction(&unhideAllAction);
+	popup.addAction(&hideAction);
+	popup.addAction(&mixerRenameAction);
+	popup.addAction(&filtersAction);
+	popup.addSeparator();
+	popup.addAction(&toggleControlLayoutAction);
+	popup.addSeparator();
+	popup.addAction(&advPropAction);
+	popup.exec(QCursor::pos());
+}
+
+void OBSBasic::VolControlContextMenu() {
 	VolControl *vol = reinterpret_cast<VolControl*>(sender());
 
 	/* ------------------- */
@@ -2914,6 +3058,16 @@ void OBSBasic::on_vMixerScrollArea_customContextMenuRequested()
 	StackedMixerAreaContextMenuRequested();
 }
 
+void OBSBasic::on_hMasterMixerScrollArea_customContextMenuRequested()
+{
+	StackedMasterMixerAreaContextMenuRequested();
+}
+
+void OBSBasic::on_vMasterMixerScrollArea_customContextMenuRequested()
+{
+	StackedMasterMixerAreaContextMenuRequested();
+}
+
 void OBSBasic::StackedMixerAreaContextMenuRequested()
 {
 	QAction unhideAllAction(QTStr("UnhideAll"), this);
@@ -2952,12 +3106,58 @@ void OBSBasic::StackedMixerAreaContextMenuRequested()
 	popup.exec(QCursor::pos());
 }
 
-void OBSBasic::ToggleMixerLayout(bool vertical)
+void OBSBasic::StackedMasterMixerAreaContextMenuRequested()
 {
-	if (vertical) {
+	QAction unhideAllAction(QTStr("UnhideAll"), this);
+
+	QAction advPropAction(QTStr("Basic.MainMenu.Edit.AdvAudio"), this);
+
+	QAction toggleControlLayoutAction(QTStr("VerticalLayoutMaster"), this);
+	toggleControlLayoutAction.setCheckable(true);
+	toggleControlLayoutAction.setChecked(config_get_bool(GetGlobalConfig(),
+		"BasicWindow", "VerticalMasterVolControl"));
+
+	/* ------------------- */
+
+	connect(&unhideAllAction, &QAction::triggered,
+		this, &OBSBasic::UnhideAllMasterAudioControls,
+		Qt::DirectConnection);
+
+	connect(&advPropAction, &QAction::triggered,
+		this, &OBSBasic::on_actionAdvAudioProperties_triggered,
+		Qt::DirectConnection);
+
+	/* ------------------- */
+
+	connect(&toggleControlLayoutAction, &QAction::changed, this,
+		&OBSBasic::ToggleMasterVolControlLayout,
+		Qt::DirectConnection);
+
+	/* ------------------- */
+
+	QMenu popup(this);
+	popup.addAction(&unhideAllAction);
+	popup.addSeparator();
+	popup.addAction(&toggleControlLayoutAction);
+	popup.addSeparator();
+	popup.addAction(&advPropAction);
+	popup.exec(QCursor::pos());
+}
+
+void OBSBasic::ToggleMixerLayout(bool vertical, bool isMaster)
+{
+	if (vertical && isMaster) {
+		InitAudioMasterMixer();
+		ui->stackedMasterMixerArea->setCurrentIndex(1);
+		ui->stackedMasterMixerArea->setMinimumSize(90, 220);
+	} else if (!vertical && isMaster) {
+		InitAudioMasterMixer();
+		ui->stackedMasterMixerArea->setMinimumSize(220, 0);
+		ui->stackedMasterMixerArea->setCurrentIndex(0);
+	} else if (vertical && !isMaster) {
 		ui->stackedMixerArea->setMinimumSize(180, 220);
 		ui->stackedMixerArea->setCurrentIndex(1);
-	} else {
+	} else if (!vertical && !isMaster) {
 		ui->stackedMixerArea->setMinimumSize(220, 0);
 		ui->stackedMixerArea->setCurrentIndex(0);
 	}
@@ -2969,7 +3169,7 @@ void OBSBasic::ToggleVolControlLayout()
 			"VerticalVolControl");
 	config_set_bool(GetGlobalConfig(), "BasicWindow", "VerticalVolControl",
 			vertical);
-	ToggleMixerLayout(vertical);
+	ToggleMixerLayout(vertical, false);
 
 	// We need to store it so we can delete current and then add
 	// at the right order
@@ -2983,6 +3183,15 @@ void OBSBasic::ToggleVolControlLayout()
 		ActivateAudioSource(source);
 }
 
+void OBSBasic::ToggleMasterVolControlLayout()
+{
+	bool vertical = !config_get_bool(GetGlobalConfig(), "BasicWindow",
+			"VerticalMasterVolControl");
+	config_set_bool(GetGlobalConfig(), "BasicWindow", "VerticalMasterVolControl",
+			vertical);
+	ToggleMixerLayout(vertical, true);
+}
+
 void OBSBasic::ActivateAudioSource(OBSSource source)
 {
 	if (SourceMixerHidden(source))
@@ -2990,7 +3199,8 @@ void OBSBasic::ActivateAudioSource(OBSSource source)
 
 	bool vertical = config_get_bool(GetGlobalConfig(), "BasicWindow",
 			"VerticalVolControl");
-	VolControl *vol = new VolControl(source, true, vertical);
+	VolControl *vol = new VolControl(source, NULL, true, vertical,
+			SOURCE_IS_NOT_TRACK);
 
 	double meterDecayRate = config_get_double(basicConfig, "Audio",
 			"MeterDecayRate");
@@ -3028,6 +3238,108 @@ void OBSBasic::ActivateAudioSource(OBSSource source)
 			ui->vVolControlLayout->addWidget(volume);
 		else
 			ui->hVolControlLayout->addWidget(volume);
+	}
+}
+
+void OBSBasic::InitAudioMasterMixer()
+{
+	ClearMasterVolumeControls();
+	OBSBasic *main = reinterpret_cast<OBSBasic*>(App()->GetMainWindow());
+	std::string mode = config_get_string(main->Config(), "Output", "Mode");
+	bool isAdvancedMode = mode.compare("Advanced") == 0 ;
+	bool vertical = config_get_bool(GetGlobalConfig(), "BasicWindow",
+			"VerticalMasterVolControl");
+
+	obs_audio_mix_lock();
+	obs_volmeter_t **meters = (obs_volmeter_t **)obs_audio_mix_meters();
+	obs_fader_t **faders = (obs_fader_t **)obs_audio_mix_faders();
+	bool *muted = obs_audio_mix_muted();
+	obs_source_t **tracks = (obs_source_t **)obs_audio_mix_tracks();
+	VolControl *vol[MAX_AUDIO_MIXES];
+	bool hidden[MAX_AUDIO_MIXES];
+	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+		vol[i] = new VolControl(tracks[i], &muted[i], true, vertical, i);
+		meters[i] = vol[i]->GetMeter();
+		faders[i] = vol[i]->GetFader();
+		std::string trackNum = "Track" + std::to_string(i + 1) + "Name";
+		const char *nameAdv = config_get_string(main->Config(), "AdvOut",
+				trackNum.c_str());
+		trackNum = "Track " + std::to_string(i + 1);
+		const char *name;
+		if (nameAdv) {
+			std::string nameStr = nameAdv;
+			name = nameStr.compare("") == 0 ? trackNum.c_str() : nameAdv;
+		} else {
+			name = trackNum.c_str();
+		}
+		if (!tracks[i]) {
+			tracks[i] = obs_source_create_private("obs_track_out",
+				name, NULL);
+			obs_data_t *private_settings =
+					obs_source_get_private_settings(tracks[i]);
+			obs_data_set_int(private_settings, "track_index", i);
+			obs_data_set_bool(private_settings, "mixer_hidden",
+					false);
+			obs_data_release(private_settings);
+		}
+		obs_source_set_track_active(tracks[i]);
+	}
+	obs_audio_mix_unlock();
+
+	double meterDecayRate = config_get_double(basicConfig, "Audio",
+			"MeterDecayRate");
+
+	uint32_t peakMeterTypeIdx = config_get_uint(basicConfig, "Audio",
+			"PeakMeterType");
+
+	enum obs_peak_meter_type peakMeterType;
+	switch (peakMeterTypeIdx) {
+	case 0:
+		peakMeterType = SAMPLE_PEAK_METER;
+		break;
+	case 1:
+		peakMeterType = TRUE_PEAK_METER;
+		break;
+	default:
+		peakMeterType = SAMPLE_PEAK_METER;
+		break;
+	}
+
+	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+		vol[i]->SetMeterDecayRate(meterDecayRate);
+		vol[i]->setPeakMeterType(peakMeterType);
+		vol[i]->setContextMenuPolicy(Qt::CustomContextMenu);
+
+		connect(vol[i], &QWidget::customContextMenuRequested,
+				this, &OBSBasic::MasterVolControlContextMenu);
+		connect(vol[i], &VolControl::ConfigClicked,
+				this, &OBSBasic::MasterVolControlContextMenu);
+
+		master_volumes.push_back(vol[i]);
+	}
+
+	for (auto volume : master_volumes) {
+		if (vertical)
+			ui->vMasterVolControlLayout->addWidget(volume);
+		else
+			ui->hMasterVolControlLayout->addWidget(volume);
+	}
+
+	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+		if (isAdvancedMode) {
+			obs_data_t *private_settings = obs_source_get_private_settings(vol[i]->GetSource());
+			obs_data_set_default_bool(private_settings, "mixer_hidden",
+					false);
+			hidden[i] = obs_data_get_bool(private_settings, "mixer_hidden");
+			obs_data_release(private_settings);
+		} else if ( i == 0) {
+			hidden[i] =  false ;
+			vol[i]->GetStreamCheckbox()->hide();
+			vol[i]->GetRecCheckbox()->hide();
+		} else {
+			hidden[i] = true;
+		}
+		vol[i]->setVisible(!hidden[i]);
 	}
 }
 
@@ -4545,7 +4857,7 @@ QMenu *OBSBasic::CreateAddSourcePopupMenu()
 		const char *name = obs_source_get_display_name(type);
 		uint32_t caps = obs_get_source_output_flags(type);
 
-		if ((caps & OBS_SOURCE_CAP_DISABLED) != 0)
+		if ((caps & OBS_SOURCE_CAP_DISABLED) != 0 || caps & OBS_SOURCE_TRACK)
 			continue;
 
 		if ((caps & OBS_SOURCE_DEPRECATED) == 0) {
@@ -6459,6 +6771,7 @@ void OBSBasic::on_resetUI_triggered()
 		ui->scenesDock,
 		ui->sourcesDock,
 		ui->mixerDock,
+		ui->mastermixerDock,
 		ui->transitionsDock,
 		ui->controlsDock
 	};
@@ -6474,6 +6787,7 @@ void OBSBasic::on_resetUI_triggered()
 	ui->scenesDock->setVisible(true);
 	ui->sourcesDock->setVisible(true);
 	ui->mixerDock->setVisible(true);
+	ui->mastermixerDock->setVisible(false);
 	ui->transitionsDock->setVisible(true);
 	ui->controlsDock->setVisible(true);
 	statsDock->setVisible(false);
@@ -6493,6 +6807,7 @@ void OBSBasic::on_lockUI_toggled(bool lock)
 	ui->scenesDock->setFeatures(features);
 	ui->sourcesDock->setFeatures(features);
 	ui->mixerDock->setFeatures(features);
+	ui->mastermixerDock->setFeatures(features);
 	ui->transitionsDock->setFeatures(features);
 	ui->controlsDock->setFeatures(features);
 	statsDock->setFeatures(features);
