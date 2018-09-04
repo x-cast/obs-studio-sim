@@ -45,37 +45,6 @@ void VolControl::OBSVolumeMuted(void *data, calldata_t *calldata)
 			Q_ARG(bool, muted));
 }
 
-
-void VolControl::MonitoringEnabled(bool checked)
-{
-	if (mon->isChecked() != checked)
-		mon->setChecked(checked);
-	SetMon(checked);
-}
-
-void VolControl::OBSMonitoringEnabled(void *data, calldata_t *calldata)
-{
-	VolControl *volControl = static_cast<VolControl*>(data);
-	bool monitoring = calldata_bool(calldata, "monitor");
-
-	QMetaObject::invokeMethod(volControl, "MonitoringEnabled",
-			Q_ARG(bool, monitoring));
-}
-
-void VolControl::SendEnabled(bool checked) {
-	if (send->isChecked() != checked)
-		send->setChecked(checked);
-	SetSends(checked);
-}
-
-void VolControl::OBSSend(void *data, calldata_t *calldata) {
-	VolControl *volControl = static_cast<VolControl*>(data);
-	bool send = calldata_bool(calldata, "send");
-
-	QMetaObject::invokeMethod(volControl, "SendEnabled",
-			Q_ARG(bool, send));
-}
-
 void VolControl::VolumeChanged()
 {
 	slider->blockSignals(true);
@@ -465,9 +434,6 @@ VolControl::VolControl(OBSSource source_, bool *mutePtr, bool showConfig, bool v
 	SetMon(monON);
 	mon->setAccessibleName(QTStr("VolControl.Mon"));
 	mon->setToolTip(QTStr("VolControl.Mon.Tooltip"));
-	if (source != nullptr)
-		signal_handler_connect(obs_source_get_signal_handler(source), "monitor",
-				OBSMonitoringEnabled, this);
 
 	QWidget::connect(mon, SIGNAL(clicked(bool)), this, SLOT(SetMon(bool)));
 	/* The send button toggles the sends of the source to output tracks.
@@ -479,9 +445,6 @@ VolControl::VolControl(OBSSource source_, bool *mutePtr, bool showConfig, bool v
 		send->setChecked(sends);
 		send->setAccessibleName(QTStr("VolControl.Sends"));
 		send->setToolTip(QTStr("VolControl.Sends.Tooltip"));
-		if (source != nullptr)
-			signal_handler_connect(obs_source_get_signal_handler(source),
-					"send", OBSSend, this);
 		QWidget::connect(send, SIGNAL(clicked(bool)), this,
 				SLOT(SetSends(bool)));
 	}
@@ -546,10 +509,6 @@ VolControl::~VolControl()
 	if (source != nullptr) {
 		signal_handler_disconnect(obs_source_get_signal_handler(source),
 				"mute", OBSVolumeMuted, this);
-		signal_handler_disconnect(obs_source_get_signal_handler(source),
-				"monitor", OBSMonitoringEnabled, this);
-		signal_handler_disconnect(obs_source_get_signal_handler(source),
-				"sends", OBSSend, this);
 	}
 	obs_fader_destroy(obs_fader);
 	obs_volmeter_destroy(obs_volmeter);

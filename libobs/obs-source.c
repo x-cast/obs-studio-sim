@@ -61,8 +61,6 @@ static const char *source_signals[] = {
 	"void show(ptr source)",
 	"void hide(ptr source)",
 	"void mute(ptr source, bool muted)",
-	"void monitor(ptr source, bool monitoring)",
-	"void send(ptr source, bool send)",
 	"void push_to_mute_changed(ptr source, bool enabled)",
 	"void push_to_mute_delay(ptr source, int delay)",
 	"void push_to_talk_changed(ptr source, bool enabled)",
@@ -235,71 +233,6 @@ static bool obs_source_hotkey_unmute(void *data,
 	return true;
 }
 
-static bool obs_source_hotkey_monitor(void *data,
-	obs_hotkey_pair_id id, obs_hotkey_t *key, bool pressed)
-{
-	UNUSED_PARAMETER(id);
-	UNUSED_PARAMETER(key);
-	bool monON;
-	struct obs_source *source = data;
-
-	enum obs_monitoring_type type = obs_source_get_monitoring_type(source);
-	monON = type == OBS_MONITORING_TYPE_NONE ? false : true;
-	if (!pressed || monON)
-		return false;
-
-	source->monitoring = true;
-	obs_source_set_monitoring(source, true);
-
-	return true;
-}
-
-static bool obs_source_hotkey_unmonitor(void *data,
-	obs_hotkey_pair_id id, obs_hotkey_t *key, bool pressed)
-{
-	UNUSED_PARAMETER(id);
-	UNUSED_PARAMETER(key);
-	bool monOFF;
-	struct obs_source *source = data;
-
-	enum obs_monitoring_type type = obs_source_get_monitoring_type(source);
-	monOFF = type == OBS_MONITORING_TYPE_NONE ? true : false;
-	if (!pressed || monOFF)
-		return false;
-
-	source->monitoring = false;
-	obs_source_set_monitoring(source, false);
-	return true;
-}
-
-static bool obs_source_hotkey_send(void *data,
-		obs_hotkey_pair_id id, obs_hotkey_t *key, bool pressed)
-{
-	UNUSED_PARAMETER(id);
-	UNUSED_PARAMETER(key);
-	struct obs_source *source = data;
-
-	if (!pressed || source->sends)
-		return false;
-
-	obs_source_set_send_hotkey(source, true);
-	return true;
-}
-
-static bool obs_source_hotkey_unsend(void *data,
-		obs_hotkey_pair_id id, obs_hotkey_t *key, bool pressed)
-{
-	UNUSED_PARAMETER(id);
-	UNUSED_PARAMETER(key);
-	struct obs_source *source = data;
-
-	if (!pressed || !source->sends)
-		return false;
-
-	obs_source_set_send_hotkey(source, false);
-	return true;
-}
-
 static void obs_source_hotkey_push_to_mute(void *data,
 		obs_hotkey_id id, obs_hotkey_t *key, bool pressed)
 {
@@ -347,8 +280,6 @@ static void obs_source_init_audio_hotkeys(struct obs_source *source)
 	if (!(source->info.output_flags & OBS_SOURCE_AUDIO) ||
 	    source->info.type != OBS_SOURCE_TYPE_INPUT) {
 		source->mute_unmute_key  = OBS_INVALID_HOTKEY_ID;
-		source->monitor_unmonitor_key = OBS_INVALID_HOTKEY_PAIR_ID;
-		source->send_unsend_key = OBS_INVALID_HOTKEY_PAIR_ID;
 		source->push_to_talk_key = OBS_INVALID_HOTKEY_ID;
 		return;
 	}
@@ -359,19 +290,7 @@ static void obs_source_init_audio_hotkeys(struct obs_source *source)
 			obs_source_hotkey_mute, obs_source_hotkey_unmute,
 			source, source);
 
-	source->monitor_unmonitor_key = obs_hotkey_pair_register_source(source,
-			"libobs.monitor", obs->hotkeys.monitor,
-			"libobs.unmonitor", obs->hotkeys.unmonitor,
-			obs_source_hotkey_monitor, obs_source_hotkey_unmonitor,
-			source, source);
-
 	if (!(source->info.output_flags & OBS_SOURCE_TRACK)) {
-		source->send_unsend_key = obs_hotkey_pair_register_source(source,
-				"libobs.send", obs->hotkeys.send,
-				"libobs.unsend", obs->hotkeys.unsend,
-				obs_source_hotkey_send, obs_source_hotkey_unsend,
-				source, source);
-
 		source->push_to_mute_key = obs_hotkey_register_source(source,
 				"libobs.push-to-mute", obs->hotkeys.push_to_mute,
 				obs_source_hotkey_push_to_mute, source);
@@ -406,8 +325,6 @@ static obs_source_t *obs_source_create_internal(const char *id,
 	}
 
 	source->mute_unmute_key  = OBS_INVALID_HOTKEY_PAIR_ID;
-	source->monitor_unmonitor_key = OBS_INVALID_HOTKEY_PAIR_ID;
-	source->send_unsend_key = OBS_INVALID_HOTKEY_PAIR_ID;
 	source->push_to_mute_key = OBS_INVALID_HOTKEY_ID;
 	source->push_to_talk_key = OBS_INVALID_HOTKEY_ID;
 
@@ -656,8 +573,6 @@ void obs_source_destroy(struct obs_source *source)
 	obs_hotkey_unregister(source->push_to_talk_key);
 	obs_hotkey_unregister(source->push_to_mute_key);
 	obs_hotkey_pair_unregister(source->mute_unmute_key);
-	obs_hotkey_pair_unregister(source->monitor_unmonitor_key);
-	obs_hotkey_pair_unregister(source->send_unsend_key);
 
 	for (i = 0; i < source->async_cache.num; i++)
 		obs_source_frame_decref(source->async_cache.array[i].frame);
@@ -3760,55 +3675,6 @@ void obs_source_set_muted(obs_source_t *source, bool muted)
 	pthread_mutex_unlock(&source->audio_actions_mutex);
 }
 
-void obs_source_set_monitoring(obs_source_t *source, bool monitoring) {
-	struct calldata data;
-	uint8_t stack[128];
-	struct audio_action action = {
-		.timestamp = os_gettime_ns(),
-		.type = AUDIO_ACTION_MON,
-		.set = monitoring
-	};
-
-	if (!obs_source_valid(source, "obs_source_set_monitoring"))
-		return;
-
-	source->monitoring = monitoring;
-
-	calldata_init_fixed(&data, stack, sizeof(stack));
-	calldata_set_ptr(&data, "source", source);
-	calldata_set_bool(&data, "monitor", monitoring);
-
-	signal_handler_signal(source->context.signals, "monitor", &data);
-
-	pthread_mutex_lock(&source->audio_actions_mutex);
-	da_push_back(source->audio_actions, &action);
-	pthread_mutex_unlock(&source->audio_actions_mutex);
-}
-
-void obs_source_set_send_hotkey(obs_source_t *source, bool send)
-{
-	struct calldata data;
-	uint8_t stack[128];
-	struct audio_action action = {
-		.timestamp = os_gettime_ns(),
-		.type = AUDIO_ACTION_SEND,
-		.set = send
-	};
-
-	if (!obs_source_valid(source, "obs_source_set_send_hotkey"))
-		return;
-
-	calldata_init_fixed(&data, stack, sizeof(stack));
-	calldata_set_ptr(&data, "source", source);
-	calldata_set_bool(&data, "send", send);
-
-	signal_handler_signal(source->context.signals, "send", &data);
-
-	pthread_mutex_lock(&source->audio_actions_mutex);
-	da_push_back(source->audio_actions, &action);
-	pthread_mutex_unlock(&source->audio_actions_mutex);
-}
-
 static void source_signal_push_to_changed(obs_source_t *source,
 		const char *signal, bool enabled)
 {
@@ -4015,14 +3881,10 @@ static inline void apply_audio_action(obs_source_t *source,
 		source->volume = action->vol; break;
 	case AUDIO_ACTION_MUTE:
 		source->muted = action->set; break;
-	case AUDIO_ACTION_MON:
-		source->monitoring = action->set; break;
 	case AUDIO_ACTION_PTT:
 		source->push_to_talk_pressed = action->set; break;
 	case AUDIO_ACTION_PTM:
 		source->push_to_mute_pressed = action->set; break;
-	case AUDIO_ACTION_SEND:
-		source->sends = action->set; break;
 	}
 }
 
@@ -4295,17 +4157,6 @@ enum obs_monitoring_type obs_source_get_monitoring_type(
 {
 	return obs_source_valid(source, "obs_source_get_monitoring_type") ?
 		source->monitoring_type : OBS_MONITORING_TYPE_NONE;
-}
-
-void obs_source_set_monitoring_state(obs_source_t *source, bool monitorActive)
-{
-	source->monitoring = monitorActive;
-}
-
-bool obs_source_get_monitoring_state(const obs_source_t *source)
-{
-	return obs_source_valid(source, "obs_source_get_monitoring_state") ?
-			source->monitoring : false;
 }
 
 void obs_source_set_sends(obs_source_t *source, bool sends)

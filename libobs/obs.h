@@ -1035,8 +1035,6 @@ EXPORT void obs_source_set_enabled(obs_source_t *source, bool enabled);
 
 EXPORT bool obs_source_muted(const obs_source_t *source);
 EXPORT void obs_source_set_muted(obs_source_t *source, bool muted);
-EXPORT void obs_source_set_monitoring(obs_source_t *source, bool monON);
-EXPORT void obs_source_set_send_hotkey(obs_source_t *source, bool send);
 
 EXPORT bool obs_source_push_to_mute_enabled(obs_source_t *source);
 EXPORT void obs_source_enable_push_to_mute(obs_source_t *source, bool enabled);
@@ -1097,8 +1095,6 @@ EXPORT void obs_source_set_monitoring_type(obs_source_t *source,
 EXPORT enum obs_monitoring_type obs_source_get_monitoring_type(
 		const obs_source_t *source);
 
-EXPORT void obs_source_set_monitoring_state(obs_source_t *source, bool monitoring);
-EXPORT bool obs_source_get_monitoring_state(const obs_source_t *source);
 EXPORT void obs_source_set_sends(obs_source_t *source, bool sends);
 EXPORT bool obs_source_get_sends(const obs_source_t *source);
 EXPORT void obs_source_set_track_active(obs_source_t *source);

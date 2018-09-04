@@ -143,8 +143,6 @@ EXPORT void obs_hotkeys_set_translations_s(
 
 EXPORT void obs_hotkeys_set_audio_hotkeys_translations(
 		const char *mute, const char *unmute,
-		const char *monitor, const char *unmonitor,
-		const char *send, const char *unsend,
 		const char *push_to_mute, const char *push_to_talk);
 
 EXPORT void obs_hotkeys_set_sceneitem_hotkeys_translations(
