@@ -74,6 +74,9 @@ struct obs_output_info {
 
 	/* raw audio callback for multi track outputs */
 	void (*raw_audio2)(void *data, size_t idx, struct audio_data *frames);
+
+	/* get dynamic bitrate state (bitrate increasing, decreasing or stationary) */
+	int (*get_bitrate_state)(void *data);
 };
 
 EXPORT void obs_register_output_s(const struct obs_output_info *info,
