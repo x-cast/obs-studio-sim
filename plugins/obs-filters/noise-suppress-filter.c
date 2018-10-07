@@ -27,7 +27,7 @@
 #define MT_ obs_module_text
 #define TEXT_SUPPRESS_LEVEL             MT_("NoiseSuppress.SuppressLevel")
 
-#define MAX_PREPROC_CHANNELS            8
+#define MAX_PREPROC_CHANNELS            16
 
 /* -------------------------------------------------------- */
 

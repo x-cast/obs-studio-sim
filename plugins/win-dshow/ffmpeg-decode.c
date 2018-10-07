@@ -94,19 +94,44 @@ static inline enum audio_format convert_sample_format(int f)
 	return AUDIO_FORMAT_UNKNOWN;
 }
 
-static inline enum speaker_layout convert_speaker_layout(uint8_t channels)
+static inline enum speaker_layout convert_ff_channel_layout(uint64_t channel_layout)
 {
-	switch (channels) {
-	case 0:     return SPEAKERS_UNKNOWN;
-	case 1:     return SPEAKERS_MONO;
-	case 2:     return SPEAKERS_STEREO;
-	case 3:     return SPEAKERS_2POINT1;
-	case 4:     return SPEAKERS_4POINT0;
-	case 5:     return SPEAKERS_4POINT1;
-	case 6:     return SPEAKERS_5POINT1;
-	case 8:     return SPEAKERS_7POINT1;
-	default:    return SPEAKERS_UNKNOWN;
+	switch (channel_layout) {
+
+	case AV_CH_LAYOUT_MONO:              return SPEAKERS_MONO;
+	case AV_CH_LAYOUT_STEREO:            return SPEAKERS_STEREO;
+	case AV_CH_LAYOUT_2_1:               return SPEAKERS_2POINT1;
+	case AV_CH_LAYOUT_SURROUND:          return SPEAKERS_3POINT0;
+	case AV_CH_LAYOUT_4POINT0:           return SPEAKERS_4POINT0;
+	case AV_CH_LAYOUT_QUAD:              return SPEAKERS_QUAD;
+	case AV_CH_LAYOUT_3POINT1:           return SPEAKERS_3POINT1;
+	case AV_CH_LAYOUT_5POINT0_BACK:      return SPEAKERS_5POINT0;
+	case AV_CH_LAYOUT_4POINT1:           return SPEAKERS_4POINT1;
+	case AV_CH_LAYOUT_5POINT1:           return SPEAKERS_5POINT1;
+	case AV_CH_LAYOUT_6POINT0:           return SPEAKERS_6POINT0;
+	case AV_CH_LAYOUT_6POINT1:           return SPEAKERS_6POINT1;
+	case AV_CH_LAYOUT_7POINT0:           return SPEAKERS_7POINT0;
+	case AV_CH_LAYOUT_7POINT1:           return SPEAKERS_7POINT1;
+	case AV_CH_LAYOUT_OCTAGONAL:         return SPEAKERS_OCTAGONAL;
+	case (AV_CH_LAYOUT_OCTAGONAL | AV_CH_TOP_CENTER):
+	                                     return SPEAKERS_9POINT0;
+	case (AV_CH_LAYOUT_6POINT0_FRONT | AV_CH_BACK_CENTER | AV_CH_BACK_LEFT | AV_CH_BACK_RIGHT | AV_CH_TOP_CENTER):
+	                                     return SPEAKERS_10POINT0;
+	case (AV_CH_LAYOUT_OCTAGONAL | AV_CH_TOP_CENTER | AV_CH_TOP_FRONT_LEFT | AV_CH_TOP_FRONT_RIGHT):
+	                                     return SPEAKERS_11POINT0;
+	case (AV_CH_LAYOUT_OCTAGONAL | AV_CH_TOP_CENTER | AV_CH_TOP_FRONT_LEFT | AV_CH_TOP_FRONT_RIGHT | AV_CH_TOP_FRONT_CENTER):
+	                                     return SPEAKERS_12POINT0;
+	case (AV_CH_LAYOUT_OCTAGONAL | AV_CH_TOP_CENTER | AV_CH_TOP_FRONT_LEFT | AV_CH_TOP_FRONT_RIGHT | AV_CH_TOP_FRONT_CENTER | AV_CH_TOP_BACK_CENTER):
+	                                     return SPEAKERS_13POINT0;
+	case (AV_CH_LAYOUT_OCTAGONAL | AV_CH_TOP_CENTER | AV_CH_TOP_FRONT_LEFT | AV_CH_TOP_FRONT_RIGHT | AV_CH_TOP_FRONT_CENTER | AV_CH_TOP_BACK_LEFT | AV_CH_TOP_BACK_RIGHT):
+	                                     return SPEAKERS_14POINT0;
+	case (AV_CH_LAYOUT_OCTAGONAL | AV_CH_TOP_CENTER | AV_CH_TOP_FRONT_LEFT | AV_CH_TOP_FRONT_RIGHT | AV_CH_TOP_FRONT_CENTER | AV_CH_TOP_BACK_CENTER | AV_CH_TOP_BACK_LEFT | AV_CH_TOP_BACK_RIGHT):
+	                                     return SPEAKERS_15POINT0;
+	case AV_CH_LAYOUT_HEXADECAGONAL:     return SPEAKERS_HEXADECAGONAL;
 	}
+
+	/* shouldn't get here */
+	return  SPEAKERS_UNKNOWN;
 }
 
 static inline void copy_data(struct ffmpeg_decode *decode, uint8_t *data,
@@ -166,9 +191,8 @@ bool ffmpeg_decode_audio(struct ffmpeg_decode *decode,
 		audio->data[i] = decode->frame->data[i];
 
 	audio->samples_per_sec = decode->frame->sample_rate;
+	audio->speakers        = convert_ff_channel_layout(decode->decoder->channel_layout);
 	audio->format          = convert_sample_format(decode->frame->format);
-	audio->speakers        =
-		convert_speaker_layout((uint8_t)decode->decoder->channels);
 
 	audio->frames = decode->frame->nb_samples;
 

@@ -382,12 +382,7 @@ static bool create_audio_stream(struct ffmpeg_data *data, int idx)
 	context->time_base       = (AVRational){ 1, aoi.samples_per_sec };
 	context->channels        = get_audio_channels(aoi.speakers);
 	context->sample_rate     = aoi.samples_per_sec;
-	context->channel_layout  =
-			av_get_default_channel_layout(context->channels);
-
-	//AVlib default channel layout for 5 channels is 5.0 ; fix for 4.1
-	if (aoi.speakers == SPEAKERS_4POINT1)
-		context->channel_layout = av_get_channel_layout("4.1");
+	context->channel_layout = convert_speaker_layout(aoi.speakers);
 
 	context->sample_fmt  = data->acodec->sample_fmts ?
 		data->acodec->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
