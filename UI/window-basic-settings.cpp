@@ -1751,8 +1751,10 @@ void OBSBasicSettings::LoadVideoSettings()
 
 static inline bool IsSurround(const char *speakers)
 {
-	static const char *surroundLayouts[] = {"2.1", "4.0", "4.1",
-						"5.1", "7.1", nullptr};
+	static const char *surroundLayouts[] = {
+		"2.1",  "3.0",  "4.0",  "quad", "3.1",  "5.0",  "4.1",  "5.1",
+		"6.0",  "6.1",  "7.0",  "7.1",  "8.0",  "9.0",  "10.0", "11.0",
+		"12.0", "13.0", "14.0", "15.0", "16.0", nullptr};
 
 	if (!speakers || !*speakers)
 		return false;
@@ -2532,14 +2534,46 @@ void OBSBasicSettings::LoadAudioSettings()
 		ui->channelSetup->setCurrentIndex(0);
 	else if (strcmp(speakers, "2.1") == 0)
 		ui->channelSetup->setCurrentIndex(2);
-	else if (strcmp(speakers, "4.0") == 0)
+	else if (strcmp(speakers, "3.0") == 0)
 		ui->channelSetup->setCurrentIndex(3);
-	else if (strcmp(speakers, "4.1") == 0)
+	else if (strcmp(speakers, "4.0") == 0)
 		ui->channelSetup->setCurrentIndex(4);
-	else if (strcmp(speakers, "5.1") == 0)
+	else if (strcmp(speakers, "quad") == 0)
 		ui->channelSetup->setCurrentIndex(5);
-	else if (strcmp(speakers, "7.1") == 0)
+	else if (strcmp(speakers, "3.1") == 0)
 		ui->channelSetup->setCurrentIndex(6);
+	else if (strcmp(speakers, "5.0") == 0)
+		ui->channelSetup->setCurrentIndex(7);
+	else if (strcmp(speakers, "4.1") == 0)
+		ui->channelSetup->setCurrentIndex(8);
+	else if (strcmp(speakers, "5.1") == 0)
+		ui->channelSetup->setCurrentIndex(9);
+	else if (strcmp(speakers, "6.0") == 0)
+		ui->channelSetup->setCurrentIndex(10);
+	else if (strcmp(speakers, "6.1") == 0)
+		ui->channelSetup->setCurrentIndex(11);
+	else if (strcmp(speakers, "7.0") == 0)
+		ui->channelSetup->setCurrentIndex(12);
+	else if (strcmp(speakers, "7.1") == 0)
+		ui->channelSetup->setCurrentIndex(13);
+	else if (strcmp(speakers, "8.0") == 0)
+		ui->channelSetup->setCurrentIndex(14);
+	else if (strcmp(speakers, "9.0") == 0)
+		ui->channelSetup->setCurrentIndex(15);
+	else if (strcmp(speakers, "10.0") == 0)
+		ui->channelSetup->setCurrentIndex(16);
+	else if (strcmp(speakers, "11.0") == 0)
+		ui->channelSetup->setCurrentIndex(17);
+	else if (strcmp(speakers, "12.0") == 0)
+		ui->channelSetup->setCurrentIndex(18);
+	else if (strcmp(speakers, "13.0") == 0)
+		ui->channelSetup->setCurrentIndex(19);
+	else if (strcmp(speakers, "14.0") == 0)
+		ui->channelSetup->setCurrentIndex(20);
+	else if (strcmp(speakers, "15.0") == 0)
+		ui->channelSetup->setCurrentIndex(21);
+	else if (strcmp(speakers, "16.0") == 0)
+		ui->channelSetup->setCurrentIndex(22);
 	else
 		ui->channelSetup->setCurrentIndex(1);
 
@@ -3725,18 +3759,65 @@ void OBSBasicSettings::SaveAudioSettings()
 		channelSetup = "2.1";
 		break;
 	case 3:
-		channelSetup = "4.0";
+		channelSetup = "3.0";
 		break;
 	case 4:
-		channelSetup = "4.1";
+		channelSetup = "4.0";
 		break;
 	case 5:
-		channelSetup = "5.1";
+		channelSetup = "quad";
 		break;
 	case 6:
+		channelSetup = "3.1";
+		break;
+	case 7:
+		channelSetup = "5.0";
+		break;
+	case 8:
+		channelSetup = "4.1";
+		break;
+	case 9:
+		channelSetup = "5.1";
+		break;
+	case 10:
+		channelSetup = "6.0";
+		break;
+	case 11:
+		channelSetup = "6.1";
+		break;
+	case 12:
+		channelSetup = "7.0";
+		break;
+	case 13:
 		channelSetup = "7.1";
 		break;
-
+	case 14:
+		channelSetup = "8.0";
+		break;
+	case 15:
+		channelSetup = "9.0";
+		break;
+	case 16:
+		channelSetup = "10.0";
+		break;
+	case 17:
+		channelSetup = "11.0";
+		break;
+	case 18:
+		channelSetup = "12.0";
+		break;
+	case 19:
+		channelSetup = "13.0";
+		break;
+	case 20:
+		channelSetup = "14.0";
+		break;
+	case 21:
+		channelSetup = "15.0";
+		break;
+	case 22:
+		channelSetup = "16.0";
+		break;
 	default:
 		channelSetup = "Stereo";
 		break;

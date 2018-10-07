@@ -26,7 +26,7 @@ extern "C" {
 #endif
 
 #define MAX_AUDIO_MIXES 6
-#define MAX_AUDIO_CHANNELS 8
+#define MAX_AUDIO_CHANNELS 16
 #define AUDIO_OUTPUT_FRAMES 1024
 
 #define TOTAL_AUDIO_SIZE                                              \
@@ -64,15 +64,40 @@ enum audio_format {
  * Standard channel layouts where retrieved from ffmpeg documentation at:
  *     https://trac.ffmpeg.org/wiki/AudioChannelManipulation
  */
+
+/* enum is in same order as FFmpeg; first layout for a given number of channels
+ * is the default one. Layouts such as 7.1(wide) which are not used in practice
+ * have been dropped.
+ * They are all supported by FFmpeg native aac encoder through PCE (program
+ * configuration elements).
+ * The layouts not requiring a PCE are given by the aac spec as:
+ * mono, stereo, 3.0, 4.0, 5.0, 5.1, 7.1 .
+ */
 enum speaker_layout {
-	SPEAKERS_UNKNOWN,     /**< Unknown setting, fallback is stereo. */
-	SPEAKERS_MONO,        /**< Channels: MONO */
-	SPEAKERS_STEREO,      /**< Channels: FL, FR */
-	SPEAKERS_2POINT1,     /**< Channels: FL, FR, LFE */
-	SPEAKERS_4POINT0,     /**< Channels: FL, FR, FC, RC */
-	SPEAKERS_4POINT1,     /**< Channels: FL, FR, FC, LFE, RC */
-	SPEAKERS_5POINT1,     /**< Channels: FL, FR, FC, LFE, RL, RR */
-	SPEAKERS_7POINT1 = 8, /**< Channels: FL, FR, FC, LFE, RL, RR, SL, SR */
+	SPEAKERS_UNKNOWN, /**< Unknown setting, fallback is stereo. */
+	SPEAKERS_MONO,    /**< Channels: MONO */
+	SPEAKERS_STEREO,  /**< Channels: FL, FR */
+	SPEAKERS_2POINT1, /**< Channels: FL, FR, LFE */
+	SPEAKERS_3POINT0,
+	SPEAKERS_4POINT0, /**< Channels: FL, FR, FC, RC */
+	SPEAKERS_QUAD,
+	SPEAKERS_3POINT1,
+	SPEAKERS_5POINT0,
+	SPEAKERS_4POINT1, /**< Channels: FL, FR, FC, LFE, RC */
+	SPEAKERS_5POINT1, /**< Channels: FL, FR, FC, LFE, RL, RR */
+	SPEAKERS_6POINT0,
+	SPEAKERS_6POINT1,
+	SPEAKERS_7POINT0,
+	SPEAKERS_7POINT1, /**< Channels: FL, FR, FC, LFE, RL, RR, SL, SR */
+	SPEAKERS_OCTAGONAL,
+	SPEAKERS_9POINT0,
+	SPEAKERS_10POINT0,
+	SPEAKERS_11POINT0,
+	SPEAKERS_12POINT0,
+	SPEAKERS_13POINT0,
+	SPEAKERS_14POINT0,
+	SPEAKERS_15POINT0,
+	SPEAKERS_HEXADECAGONAL,
 };
 
 struct audio_data {
@@ -116,15 +141,40 @@ static inline uint32_t get_audio_channels(enum speaker_layout speakers)
 	case SPEAKERS_STEREO:
 		return 2;
 	case SPEAKERS_2POINT1:
+	case SPEAKERS_3POINT0:
 		return 3;
 	case SPEAKERS_4POINT0:
+	case SPEAKERS_QUAD:
+	case SPEAKERS_3POINT1:
 		return 4;
+	case SPEAKERS_5POINT0:
 	case SPEAKERS_4POINT1:
 		return 5;
 	case SPEAKERS_5POINT1:
+	case SPEAKERS_6POINT0:
 		return 6;
+	case SPEAKERS_6POINT1:
+	case SPEAKERS_7POINT0:
+		return 7;
 	case SPEAKERS_7POINT1:
+	case SPEAKERS_OCTAGONAL:
 		return 8;
+	case SPEAKERS_9POINT0:
+		return 9;
+	case SPEAKERS_10POINT0:
+		return 10;
+	case SPEAKERS_11POINT0:
+		return 11;
+	case SPEAKERS_12POINT0:
+		return 12;
+	case SPEAKERS_13POINT0:
+		return 13;
+	case SPEAKERS_14POINT0:
+		return 14;
+	case SPEAKERS_15POINT0:
+		return 15;
+	case SPEAKERS_HEXADECAGONAL:
+		return 16;
 	case SPEAKERS_UNKNOWN:
 		return 0;
 	}

@@ -30,8 +30,6 @@ static enum speaker_layout
 pulseaudio_channels_to_obs_speakers(uint_fast32_t channels)
 {
 	switch (channels) {
-	case 0:
-		return SPEAKERS_UNKNOWN;
 	case 1:
 		return SPEAKERS_MONO;
 	case 2:
@@ -41,11 +39,23 @@ pulseaudio_channels_to_obs_speakers(uint_fast32_t channels)
 	case 4:
 		return SPEAKERS_4POINT0;
 	case 5:
-		return SPEAKERS_4POINT1;
+		return SPEAKERS_5POINT0;
 	case 6:
 		return SPEAKERS_5POINT1;
+	case 7:
+		return SPEAKERS_6POINT1;
 	case 8:
 		return SPEAKERS_7POINT1;
+	case 9:
+		return SPEAKERS_9POINT0;
+	case 10:
+		return SPEAKERS_10POINT0;
+	case 11:
+		return SPEAKERS_11POINT0;
+	case 12:
+		return SPEAKERS_12POINT0;
+	case 16:
+		return SPEAKERS_HEXADECAGONAL;
 	default:
 		return SPEAKERS_UNKNOWN;
 	}
@@ -80,6 +90,14 @@ static pa_channel_map pulseaudio_channel_map(enum speaker_layout layout)
 	ret.map[5] = PA_CHANNEL_POSITION_REAR_RIGHT;
 	ret.map[6] = PA_CHANNEL_POSITION_SIDE_LEFT;
 	ret.map[7] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+	ret.map[8] = PA_CHANNEL_POSITION_REAR_CENTER;
+	ret.map[9] = PA_CHANNEL_POSITION_AUX1;
+	ret.map[10] = PA_CHANNEL_POSITION_AUX2;
+	ret.map[11] = PA_CHANNEL_POSITION_AUX3;
+	ret.map[12] = PA_CHANNEL_POSITION_AUX4;
+	ret.map[13] = PA_CHANNEL_POSITION_AUX5;
+	ret.map[14] = PA_CHANNEL_POSITION_AUX6;
+	ret.map[15] = PA_CHANNEL_POSITION_AUX7;
 
 	switch (layout) {
 	case SPEAKERS_MONO:
@@ -96,9 +114,29 @@ static pa_channel_map pulseaudio_channel_map(enum speaker_layout layout)
 		ret.map[2] = PA_CHANNEL_POSITION_LFE;
 		break;
 
+	case SPEAKERS_3POINT0:
+		ret.channels = 3;
+		break;
+
 	case SPEAKERS_4POINT0:
 		ret.channels = 4;
 		ret.map[3] = PA_CHANNEL_POSITION_REAR_CENTER;
+		break;
+
+	case SPEAKERS_QUAD:
+		ret.channels = 4;
+		ret.map[2] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		break;
+
+	case SPEAKERS_3POINT1:
+		ret.channels = 4;
+		break;
+
+	case SPEAKERS_5POINT0:
+		ret.channels = 5;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
 		break;
 
 	case SPEAKERS_4POINT1:
@@ -110,8 +148,87 @@ static pa_channel_map pulseaudio_channel_map(enum speaker_layout layout)
 		ret.channels = 6;
 		break;
 
+	case SPEAKERS_6POINT0:
+		ret.channels = 6;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_REAR_CENTER;
+		break;
+
+	case SPEAKERS_6POINT1:
+		ret.channels = 7;
+		ret.map[6] = PA_CHANNEL_POSITION_REAR_CENTER;
+		break;
+
+	case SPEAKERS_7POINT0:
+		ret.channels = 7;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		break;
+
 	case SPEAKERS_7POINT1:
 		ret.channels = 8;
+		break;
+
+	case SPEAKERS_OCTAGONAL:
+		ret.channels = 8;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
+		break;
+
+	case SPEAKERS_9POINT0:
+		ret.channels = 9;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
+		ret.map[8] = PA_CHANNEL_POSITION_AUX0;
+		break;
+
+	case SPEAKERS_10POINT0:
+		ret.channels = 10;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
+		ret.map[8] = PA_CHANNEL_POSITION_AUX0;
+		break;
+
+	case SPEAKERS_11POINT0:
+		ret.channels = 11;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
+		ret.map[8] = PA_CHANNEL_POSITION_AUX0;
+		break;
+
+	case SPEAKERS_12POINT0:
+		ret.channels = 12;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
+		ret.map[8] = PA_CHANNEL_POSITION_AUX0;
+		break;
+
+	case SPEAKERS_HEXADECAGONAL:
+		ret.channels = 16;
+		ret.map[3] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
+		ret.map[8] = PA_CHANNEL_POSITION_AUX0;
 		break;
 
 	case SPEAKERS_UNKNOWN:

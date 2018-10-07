@@ -59,7 +59,7 @@ bool nvafx_loaded = false;
 #define TEXT_METHOD_NVAFX_DEREVERB_DENOISER \
 	MT_("NoiseSuppress.Method.Nvafx.Dereverb.Denoiser")
 
-#define MAX_PREPROC_CHANNELS 8
+#define MAX_PREPROC_CHANNELS 16
 
 /* RNNoise constants, these can't be changed */
 #define RNNOISE_SAMPLE_RATE 48000

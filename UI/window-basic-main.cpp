@@ -4839,14 +4839,46 @@ bool OBSBasic::ResetAudio()
 		ai.speakers = SPEAKERS_MONO;
 	else if (strcmp(channelSetupStr, "2.1") == 0)
 		ai.speakers = SPEAKERS_2POINT1;
+	else if (strcmp(channelSetupStr, "3.0") == 0)
+		ai.speakers = SPEAKERS_3POINT0;
 	else if (strcmp(channelSetupStr, "4.0") == 0)
 		ai.speakers = SPEAKERS_4POINT0;
+	else if (strcmp(channelSetupStr, "quad") == 0)
+		ai.speakers = SPEAKERS_QUAD;
+	else if (strcmp(channelSetupStr, "3.1") == 0)
+		ai.speakers = SPEAKERS_3POINT1;
+	else if (strcmp(channelSetupStr, "5.0") == 0)
+		ai.speakers = SPEAKERS_5POINT0;
 	else if (strcmp(channelSetupStr, "4.1") == 0)
 		ai.speakers = SPEAKERS_4POINT1;
 	else if (strcmp(channelSetupStr, "5.1") == 0)
 		ai.speakers = SPEAKERS_5POINT1;
+	else if (strcmp(channelSetupStr, "6.0") == 0)
+		ai.speakers = SPEAKERS_6POINT0;
+	else if (strcmp(channelSetupStr, "6.1") == 0)
+		ai.speakers = SPEAKERS_6POINT1;
+	else if (strcmp(channelSetupStr, "7.0") == 0)
+		ai.speakers = SPEAKERS_7POINT0;
 	else if (strcmp(channelSetupStr, "7.1") == 0)
 		ai.speakers = SPEAKERS_7POINT1;
+	else if (strcmp(channelSetupStr, "8.0") == 0)
+		ai.speakers = SPEAKERS_OCTAGONAL;
+	else if (strcmp(channelSetupStr, "9.0") == 0)
+		ai.speakers = SPEAKERS_9POINT0;
+	else if (strcmp(channelSetupStr, "10.0") == 0)
+		ai.speakers = SPEAKERS_10POINT0;
+	else if (strcmp(channelSetupStr, "11.0") == 0)
+		ai.speakers = SPEAKERS_11POINT0;
+	else if (strcmp(channelSetupStr, "12.0") == 0)
+		ai.speakers = SPEAKERS_12POINT0;
+	else if (strcmp(channelSetupStr, "13.0") == 0)
+		ai.speakers = SPEAKERS_13POINT0;
+	else if (strcmp(channelSetupStr, "14.0") == 0)
+		ai.speakers = SPEAKERS_14POINT0;
+	else if (strcmp(channelSetupStr, "15.0") == 0)
+		ai.speakers = SPEAKERS_15POINT0;
+	else if (strcmp(channelSetupStr, "16.0") == 0)
+		ai.speakers = SPEAKERS_HEXADECAGONAL;
 	else
 		ai.speakers = SPEAKERS_STEREO;
 

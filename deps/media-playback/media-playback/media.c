@@ -94,24 +94,23 @@ static inline enum audio_format convert_sample_format(int f)
 static inline enum speaker_layout convert_speaker_layout(uint8_t channels)
 {
 	switch (channels) {
-	case 0:
-		return SPEAKERS_UNKNOWN;
-	case 1:
-		return SPEAKERS_MONO;
-	case 2:
-		return SPEAKERS_STEREO;
-	case 3:
-		return SPEAKERS_2POINT1;
-	case 4:
-		return SPEAKERS_4POINT0;
-	case 5:
-		return SPEAKERS_4POINT1;
-	case 6:
-		return SPEAKERS_5POINT1;
-	case 8:
-		return SPEAKERS_7POINT1;
-	default:
-		return SPEAKERS_UNKNOWN;
+	case 1:  return SPEAKERS_MONO;
+	case 2:  return SPEAKERS_STEREO;
+	case 3:  return SPEAKERS_2POINT1;
+	case 4:  return SPEAKERS_4POINT0;
+	case 5:  return SPEAKERS_5POINT0;
+	case 6:  return SPEAKERS_5POINT1;
+	case 7:  return SPEAKERS_6POINT1;
+	case 8:  return SPEAKERS_7POINT1;
+	case 9:  return SPEAKERS_9POINT0;
+	case 10: return SPEAKERS_10POINT0;
+	case 11: return SPEAKERS_11POINT0;
+	case 12: return SPEAKERS_12POINT0;
+	case 13: return SPEAKERS_13POINT0;
+	case 14: return SPEAKERS_14POINT0;
+	case 15: return SPEAKERS_15POINT0;
+	case 16: return SPEAKERS_HEXADECAGONAL;
+	default: return SPEAKERS_UNKNOWN;
 	}
 }
 

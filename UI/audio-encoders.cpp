@@ -178,6 +178,12 @@ static void PopulateBitrateMap()
 			// disable mf_aac if audio output is not stereo nor mono
 			if (output_channels >= 3 && encoder == "mf_aac")
 				continue;
+			//disable coreaudio aac and fdk-aac for 7 channels or 9+
+			if ((output_channels >= 9 || output_channels == 7 ||
+			     aoi.speakers == SPEAKERS_OCTAGONAL) &&
+			    (encoder == "libfdk_aac" ||
+			     encoder == "CoreAudio_AAC"))
+				continue;
 
 			HandleEncoderProperties(encoder.c_str());
 		}

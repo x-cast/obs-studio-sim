@@ -202,11 +202,23 @@ static inline enum speaker_layout convert_ca_speaker_layout(UInt32 channels)
 	case 4:
 		return SPEAKERS_4POINT0;
 	case 5:
-		return SPEAKERS_4POINT1;
+		return SPEAKERS_5POINT0;
 	case 6:
 		return SPEAKERS_5POINT1;
+	case 7:
+		return SPEAKERS_6POINT1;
 	case 8:
 		return SPEAKERS_7POINT1;
+	case 9:
+		return SPEAKERS_9POINT0;
+	case 10:
+		return SPEAKERS_10POINT0;
+	case 11:
+		return SPEAKERS_11POINT0;
+	case 12:
+		return SPEAKERS_12POINT0;
+	case 16:
+		return SPEAKERS_HEXADECAGONAL;
 	}
 
 	return SPEAKERS_UNKNOWN;
@@ -234,7 +246,7 @@ static bool coreaudio_init_format(struct coreaudio_data *ca)
 	/* Certain types of devices have no limit on channel count, and
 	 * there's no way to know the actual number of channels it's using,
 	 * so if we encounter this situation just force to what is defined in output */
-	if (desc.mChannelsPerFrame > 8) {
+	if (desc.mChannelsPerFrame > 16) {
 		desc.mChannelsPerFrame = channels;
 		desc.mBytesPerFrame = channels * desc.mBitsPerChannel / 8;
 		desc.mBytesPerPacket =

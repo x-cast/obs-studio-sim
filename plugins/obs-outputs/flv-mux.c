@@ -74,7 +74,7 @@ static void build_flv_meta_data(obs_output_t *context, uint8_t **output,
 	enc_str(&enc, end, "onMetaData");
 
 	*enc++ = AMF_ECMA_ARRAY;
-	enc = AMF_EncodeInt32(enc, end, 20);
+	enc = AMF_EncodeInt32(enc, end, 33);
 
 	enc_num_val(&enc, end, "duration", 0.0);
 	enc_num_val(&enc, end, "fileSize", 0.0);
@@ -99,11 +99,27 @@ static void build_flv_meta_data(obs_output_t *context, uint8_t **output,
 	enc_bool_val(&enc, end, "stereo",
 		     audio_output_get_channels(audio) == 2);
 	enc_bool_val(&enc, end, "2.1", audio_output_get_channels(audio) == 3);
-	enc_bool_val(&enc, end, "3.1", audio_output_get_channels(audio) == 4);
+	enc_bool_val(&enc, end, "3.0", audio_output_get_channels(audio) == 3);
 	enc_bool_val(&enc, end, "4.0", audio_output_get_channels(audio) == 4);
+	enc_bool_val(&enc, end, "quad", audio_output_get_channels(audio) == 4);
+	enc_bool_val(&enc, end, "3.1", audio_output_get_channels(audio) == 4);
+	enc_bool_val(&enc, end, "5.0", audio_output_get_channels(audio) == 5);
 	enc_bool_val(&enc, end, "4.1", audio_output_get_channels(audio) == 5);
+	enc_bool_val(&enc, end, "6.0", audio_output_get_channels(audio) == 6);
 	enc_bool_val(&enc, end, "5.1", audio_output_get_channels(audio) == 6);
+	enc_bool_val(&enc, end, "6.1", audio_output_get_channels(audio) == 7);
+	enc_bool_val(&enc, end, "7.0", audio_output_get_channels(audio) == 7);
 	enc_bool_val(&enc, end, "7.1", audio_output_get_channels(audio) == 8);
+	enc_bool_val(&enc, end, "octagonal",
+		     audio_output_get_channels(audio) == 8);
+	enc_bool_val(&enc, end, "9.0", audio_output_get_channels(audio) == 9);
+	enc_bool_val(&enc, end, "10.0", audio_output_get_channels(audio) == 10);
+	enc_bool_val(&enc, end, "11.0", audio_output_get_channels(audio) == 11);
+	enc_bool_val(&enc, end, "12.0", audio_output_get_channels(audio) == 12);
+	enc_bool_val(&enc, end, "13.0", audio_output_get_channels(audio) == 13);
+	enc_bool_val(&enc, end, "14.0", audio_output_get_channels(audio) == 14);
+	enc_bool_val(&enc, end, "15.0", audio_output_get_channels(audio) == 15);
+	enc_bool_val(&enc, end, "16.0", audio_output_get_channels(audio) == 16);
 
 	dstr_printf(&encoder_name, "%s (libobs version ", MODULE_NAME);
 
