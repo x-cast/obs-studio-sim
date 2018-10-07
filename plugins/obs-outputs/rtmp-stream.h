@@ -30,6 +30,15 @@
 #define OPT_BIND_IP "bind_ip"
 #define OPT_NEWSOCKETLOOP_ENABLED "new_socket_loop_enabled"
 #define OPT_LOWLATENCY_ENABLED "low_latency_mode_enabled"
+#define CONGESTION_ARRAY_SIZE 300 // about 10 sec of congestion memory
+#define OPT_DYN_BITRATE "DynamicBitrate"
+
+enum dynamicBitrateState {
+	BITRATE_EQUAL_INITIAL_BITRATE,
+	BITRATE_SWITCHING_DOWN, // decreasing bitrate due to congestion
+	BITRATE_SWITCHING_STATIONARY, // bitrate unchanged; bitrate < initial bitrate
+	BITRATE_SWITCHING_UP // increasing bitrate due to congestion clearing
+};
 
 //#define TEST_FRAMEDROPS
 
@@ -89,6 +98,25 @@ struct rtmp_stream {
 	size_t           droptest_size;
 #endif
 
+	/* dynamic bitrate variables */
+	int              dynamic_bitrate;
+	int              initial_bitrate;
+	bool             switch_variable_bitrate;
+	uint64_t         last_adjustment_time;
+	float            last_congestion;
+	float            mean_congestion;
+	float            congestion_array[CONGESTION_ARRAY_SIZE];
+	size_t           congestion_counter;
+	bool             increase_just_attempted;
+	int              bitrate_decrease_rate; // % at which bitrate will decrease every decrease_polling_time
+	int              bitrate_increase_rate; // % at which bitrate will increase every recovery_polling_time
+	uint64_t         recovery_polling_time; // time in seconds after which a bitrate increase is attempted if congestion is clearing.
+	uint64_t         decrease_polling_time; // time in milliseconds between two congestion tests;
+						// Bitrate decreases if congestion is found (100 ms by default).
+	int              dynamic_threshold; // congestion threshold in % above which bitrate is decreased (3% by default).
+	int              bitrate_floor; // minimum bitrate in % of initial one
+	enum dynamicBitrateState bitrate_state; // stores the dynamic bitrate state for UI status bar
+	/*-----------------------------*/
 	RTMP             rtmp;
 
 	bool             new_socket_loop;

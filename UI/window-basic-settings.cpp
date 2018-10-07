@@ -347,6 +347,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->simpleOutputABitrate, COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutAdvanced,    CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutEnforce,     CHECK_CHANGED,  OUTPUTS_CHANGED);
+	HookWidget(ui->simpleOutDynamic,     CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutPreset,      COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutCustom,      EDIT_CHANGED,   OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutRecQuality,  COMBO_CHANGED,  OUTPUTS_CHANGED);
@@ -365,6 +366,13 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->advOutTrack5,         CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutTrack6,         CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutApplyService,   CHECK_CHANGED,  OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamic,        TOGGLE_CHANGED,  OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamicDown,    SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamicUp,      SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamicThreshold,    SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamicRecoveryTime, SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamicDecreaseTime, SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutDynamicFloor,   SCROLL_CHANGED, OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecType,        COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecPath,        EDIT_CHANGED,   OUTPUTS_CHANGED);
 	HookWidget(ui->advOutNoSpace,        CHECK_CHANGED,  OUTPUTS_CHANGED);
@@ -647,6 +655,8 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	connect(ui->simpleOutAdvanced, SIGNAL(toggled(bool)),
 			this, SLOT(SimpleRecordingEncoderChanged()));
 	connect(ui->simpleOutEnforce, SIGNAL(toggled(bool)),
+			this, SLOT(SimpleRecordingEncoderChanged()));
+	connect(ui->simpleOutDynamic, SIGNAL(toggled(bool)),
 			this, SLOT(SimpleRecordingEncoderChanged()));
 	connect(ui->simpleReplayBuf, SIGNAL(toggled(bool)),
 			this, SLOT(SimpleReplayBufferChanged()));
@@ -1468,6 +1478,8 @@ void OBSBasicSettings::LoadSimpleOutputSettings()
 			"UseAdvanced");
 	bool enforceBitrate = config_get_bool(main->Config(), "SimpleOutput",
 			"EnforceBitrate");
+	bool dynamicBitrate = config_get_bool(main->Config(), "SimpleOutput",
+			"DynamicBitrate");
 	const char *preset = config_get_string(main->Config(), "SimpleOutput",
 			"Preset");
 	const char *qsvPreset = config_get_string(main->Config(), "SimpleOutput",
@@ -1517,6 +1529,7 @@ void OBSBasicSettings::LoadSimpleOutputSettings()
 
 	ui->simpleOutAdvanced->setChecked(advanced);
 	ui->simpleOutEnforce->setChecked(enforceBitrate);
+	ui->simpleOutDynamic->setChecked(dynamicBitrate);
 	ui->simpleOutCustom->setText(custom);
 
 	idx = ui->simpleOutRecQuality->findData(QString(recQual));
@@ -1550,8 +1563,30 @@ void OBSBasicSettings::LoadAdvOutputStreamingSettings()
 			"TrackIndex");
 	bool applyServiceSettings = config_get_bool(main->Config(), "AdvOut",
 			"ApplyServiceSettings");
+	bool dynamicBitrate = config_get_bool(main->Config(), "AdvOut",
+			"DynamicBitrate");
+	int dynamicBitrateDown = config_get_int(main->Config(), "AdvOut",
+			"DynamicBitrateDown");
+	int dynamicBitrateUp = config_get_int(main->Config(), "AdvOut",
+			"DynamicBitrateUp");
+	int dynamicBitrateThreshold= config_get_int(main->Config(), "AdvOut",
+			"DynamicBitrateThreshold");
+	int dynamicBitrateRecoveryTime = config_get_int(main->Config(), "AdvOut",
+			"DynamicBitrateRecoveryTime");
+	int dynamicBitrateDecreaseTime = config_get_int(main->Config(), "AdvOut",
+			"DynamicBitrateDecreaseTime");
+	int dynamicBitrateFloor = config_get_int(main->Config(), "AdvOut",
+			"DynamicBitrateFloor");
 
 	ui->advOutApplyService->setChecked(applyServiceSettings);
+	ui->advOutDynamic->setChecked(dynamicBitrate);
+	ui->widget_dyn->setVisible(dynamicBitrate);
+	ui->advOutDynamicDown->setValue(dynamicBitrateDown);
+	ui->advOutDynamicUp->setValue(dynamicBitrateUp);
+	ui->advOutDynamicThreshold->setValue(dynamicBitrateThreshold);
+	ui->advOutDynamicRecoveryTime->setValue(dynamicBitrateRecoveryTime);
+	ui->advOutDynamicDecreaseTime->setValue(dynamicBitrateDecreaseTime);
+	ui->advOutDynamicFloor->setValue(dynamicBitrateFloor);
 	ui->advOutUseRescale->setChecked(rescale);
 	ui->advOutRescale->setEnabled(rescale);
 	ui->advOutRescale->setCurrentText(rescaleRes);
@@ -3058,6 +3093,7 @@ void OBSBasicSettings::SaveOutputSettings()
 	SaveCombo(ui->simpleOutRecFormat, "SimpleOutput", "RecFormat");
 	SaveCheckBox(ui->simpleOutAdvanced, "SimpleOutput", "UseAdvanced");
 	SaveCheckBox(ui->simpleOutEnforce, "SimpleOutput", "EnforceBitrate");
+	SaveCheckBox(ui->simpleOutDynamic, "SimpleOutput", "DynamicBitrate");
 	SaveComboData(ui->simpleOutPreset, "SimpleOutput", presetType);
 	SaveEdit(ui->simpleOutCustom, "SimpleOutput", "x264Settings");
 	SaveComboData(ui->simpleOutRecQuality, "SimpleOutput", "RecQuality");
@@ -3070,6 +3106,14 @@ void OBSBasicSettings::SaveOutputSettings()
 	curAdvStreamEncoder = GetComboData(ui->advOutEncoder);
 
 	SaveCheckBox(ui->advOutApplyService, "AdvOut", "ApplyServiceSettings");
+	SaveCheckBox(ui->advOutDynamic, "AdvOut", "DynamicBitrate");
+	SaveSpinBox(ui->advOutDynamicDown, "AdvOut", "DynamicBitrateDown");
+	SaveSpinBox(ui->advOutDynamicUp, "AdvOut", "DynamicBitrateUp");
+	SaveSpinBox(ui->advOutDynamicThreshold, "AdvOut", "DynamicBitrateThreshold");
+	SaveSpinBox(ui->advOutDynamicRecoveryTime, "AdvOut", "DynamicBitrateRecoveryTime");
+	SaveSpinBox(ui->advOutDynamicDecreaseTime, "AdvOut", "DynamicBitrateDecreaseTime");
+	SaveSpinBox(ui->advOutDynamicFloor, "AdvOut", "DynamicBitrateFloor");
+
 	SaveComboData(ui->advOutEncoder, "AdvOut", "Encoder");
 	SaveCheckBox(ui->advOutUseRescale, "AdvOut", "Rescale");
 	SaveCombo(ui->advOutRescale, "AdvOut", "RescaleRes");

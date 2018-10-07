@@ -6,6 +6,17 @@
 #include <util/platform.h>
 #include <obs.h>
 
+#define OPT_DYN_BITRATE "DynamicBitrate"
+
+enum dynamicBitrateState {
+	BITRATE_EQUAL_INITIAL_BITRATE,
+	BITRATE_SWITCHING_DOWN,
+	BITRATE_SWITCHING_STATIONARY,	// This means bitrate is lower than initial bitrate so that
+					// the bitrate switching mechanism is still in place
+					// but bitrate stays stationary (until an increase is attempted).
+	BITRATE_SWITCHING_UP
+};
+
 class QLabel;
 
 class OBSBasicStatusBar : public QStatusBar {
@@ -19,6 +30,7 @@ private:
 	QLabel *cpuUsage;
 	QLabel *kbps;
 	QLabel *statusSquare;
+	QLabel *dynStatus;
 
 	obs_output_t *streamOutput = nullptr;
 	obs_output_t *recordOutput = nullptr;
@@ -48,6 +60,11 @@ private:
 	QPixmap grayPixmap;
 	QPixmap redPixmap;
 
+	QPixmap dynPixmap;
+	QPixmap dynPixmapUp;
+	QPixmap dynPixmapDown;
+	bool variableBitrateEnabled;
+
 	float lastCongestion = 0.0f;
 
 	QPointer<QTimer> refreshTimer;
@@ -62,6 +79,8 @@ private:
 	void UpdateStreamTime();
 	void UpdateRecordTime();
 	void UpdateDroppedFrames();
+	void UpdateDynamicBitrateStatus();
+	bool GetDynamicBitrateSetting();
 
 	static void OBSOutputReconnect(void *data, calldata_t *params);
 	static void OBSOutputReconnectSuccess(void *data, calldata_t *params);
