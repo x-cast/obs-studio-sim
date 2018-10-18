@@ -233,6 +233,9 @@ class MonCheckBox : public QCheckBox {
 class SendsCheckBox : public QCheckBox {
 	Q_OBJECT
 };
+class TracksCheckBox : public QCheckBox {
+	Q_OBJECT
+};
 
 class VolControl : public QWidget {
 	Q_OBJECT
@@ -251,6 +254,12 @@ private:
 	// The next checkbox controls whether monitoring_type is 'monitor only'
 	// or 'monitor and output'
 	SendsCheckBox   *send;
+	TracksCheckBox  *track1;
+	TracksCheckBox  *track2;
+	TracksCheckBox  *track3;
+	TracksCheckBox  *track4;
+	TracksCheckBox  *track5;
+	TracksCheckBox  *track6;
 	bool            *mutePtr;
 	QPushButton     *config = nullptr;
 	float           levelTotal;
@@ -265,6 +274,7 @@ private:
 		const float peak[MAX_AUDIO_CHANNELS],
 		const float inputPeak[MAX_AUDIO_CHANNELS]);
 	static void OBSVolumeMuted(void *data, calldata_t *calldata);
+	static void OBSSourceMixersChanged(void *param, calldata_t *calldata);
 
 	void EmitConfigClicked();
 
@@ -280,12 +290,20 @@ private slots:
 	void updateText();
 public slots:
 	void VolumeChanged();
+	void SourceMixersChanged(uint32_t mixers);
+	void track1Changed(bool checked);
+	void track2Changed(bool checked);
+	void track3Changed(bool checked);
+	void track4Changed(bool checked);
+	void track5Changed(bool checked);
+	void track6Changed(bool checked);
+	void showTracksButtons(bool show);
 signals:
 	void ConfigClicked();
 
 public:
 	explicit VolControl(OBSSource source, bool *mute, bool showConfig = false,
-			bool vertical = false, int trackIndex = -1);
+			bool vertical = false, bool showTracks = false, int trackIndex = -1);
 	~VolControl();
 
 	inline obs_source_t *GetSource() const {return source;}
