@@ -25,6 +25,7 @@
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libavformat/avformat.h>
+#include <libavdevice/avdevice.h>
 #include <libswscale/swscale.h>
 
 #include "obs-ffmpeg-formats.h"
@@ -65,6 +66,8 @@ struct ffmpeg_cfg {
 	int                scale_height;
 	int                width;
 	int                height;
+	const char         *device;
+	int                output_type;
 };
 
 struct ffmpeg_data {
@@ -589,9 +592,11 @@ static bool ffmpeg_data_init(struct ffmpeg_data *data,
 		return false;
 
 	av_register_all();
+	avdevice_register_all();
 	avformat_network_init();
 
 	is_rtmp = (astrcmpi_n(config->url, "rtmp://", 7) == 0);
+
 
 	AVOutputFormat *output_format = av_guess_format(
 			is_rtmp ? "flv" : data->config.format_name,
@@ -1265,12 +1270,16 @@ static bool try_connect(struct ffmpeg_output *output)
 	obs_data_t *settings;
 	bool success;
 	int ret;
+	bool is_device;
+	bool is_decklink;
 
 	settings = obs_output_get_settings(output->output);
 
 	obs_data_set_default_int(settings, "gop_size", 120);
 
-	config.url = obs_data_get_string(settings, "url");
+	is_device = obs_data_get_bool(settings, "is_device");
+	config.url = !is_device ? obs_data_get_string(settings, "url"):
+			obs_data_get_string(settings, "device_name");
 	config.format_name = get_string_or_null(settings, "format_name");
 	config.format_mime_type = get_string_or_null(settings,
 			"format_mime_type");
@@ -1290,8 +1299,12 @@ static bool try_connect(struct ffmpeg_output *output)
 	config.scale_height = (int)obs_data_get_int(settings, "scale_height");
 	config.width  = (int)obs_output_get_width(output->output);
 	config.height = (int)obs_output_get_height(output->output);
+	is_decklink = (strcmp(config.format_name, "decklink") == 0);
 	config.format = obs_to_ffmpeg_video_format(
 			video_output_get_format(video));
+	// force format to uyvy422 for decklink output
+	if (is_decklink)
+		config.format = AV_PIX_FMT_UYVY422;
 	config.audio_tracks = (int)obs_output_get_mixers(output->output);
 	config.audio_mix_count = get_audio_mix_count(config.audio_tracks);
 
@@ -1337,8 +1350,13 @@ static bool try_connect(struct ffmpeg_output *output)
 		ffmpeg_output_full_stop(output);
 		return false;
 	}
+	// convert video to uyvy422 for decklink device output format
+	struct video_scale_info to;
+	to.format                  = VIDEO_FORMAT_UYVY;
+	to.width                   = config.width;
+	to.height                  = config.height;
 
-	obs_output_set_video_conversion(output->output, NULL);
+	obs_output_set_video_conversion(output->output, is_decklink?&to:NULL);
 	obs_output_set_audio_conversion(output->output, &aci);
 	obs_output_begin_data_capture(output->output, 0);
 	output->write_thread_active = true;
