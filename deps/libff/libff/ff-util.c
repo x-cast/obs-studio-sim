@@ -22,10 +22,6 @@
 #pragma warning(disable : 4204)
 #endif
 
-#include <libavcodec/avcodec.h>
-#include <libavdevice/avdevice.h>
-#include <libavformat/avformat.h>
-#include <libavutil/log.h>
 
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -36,6 +32,7 @@
 struct ff_format_desc {
 	const char *name;
 	const char *long_name;
+	bool       is_device;
 	const char *mime_type;
 	const char *extensions;
 	enum AVCodecID audio_codec;
@@ -54,10 +51,16 @@ struct ff_codec_desc {
 	const struct ff_codec_desc *next;
 };
 
+struct ff_device_desc {
+	const char *name;// device name, depends on device format
+	const char *long_name;//human friendly name
+	const struct ff_device_desc *next;
+};
+
 void ff_init()
 {
 	av_register_all();
-	//avdevice_register_all();
+	avdevice_register_all();
 	avcodec_register_all();
 	avformat_network_init();
 }
@@ -281,6 +284,31 @@ static inline bool is_output_device(const AVClass *avclass)
 #endif
 }
 
+const struct ff_device_desc *ff_get_device_list(const char *device_name)
+{
+	AVDeviceInfoList *device_list= NULL;
+	struct ff_device_desc *desc = NULL;
+	struct ff_device_desc *current = NULL;
+	if (avdevice_list_output_sinks(NULL, device_name, NULL, &device_list) < 0)
+		return NULL;
+	for (int i = 0; i < device_list->nb_devices; i++) {
+		struct ff_device_desc *d;
+		d = av_mallocz(sizeof(struct ff_device_desc));
+		d->name = device_list->devices[i]->device_name;
+		d->long_name = device_list->devices[i]->device_description;
+
+		if (current != NULL) {
+			current->next = d;
+			current = d;
+		}
+		else {
+			desc = current = d;
+		}
+	}
+
+	return desc;
+}
+
 const struct ff_format_desc *ff_format_supported()
 {
 	AVOutputFormat *output_format = NULL;
@@ -289,8 +317,6 @@ const struct ff_format_desc *ff_format_supported()
 
 	while ((output_format = av_oformat_next(output_format)) != NULL) {
 		struct ff_format_desc *d;
-		if (is_output_device(output_format->priv_class))
-			continue;
 
 		d = av_mallocz(sizeof(struct ff_format_desc));
 
@@ -298,6 +324,7 @@ const struct ff_format_desc *ff_format_supported()
 		d->video_codec = output_format->video_codec;
 		d->name = output_format->name;
 		d->long_name = output_format->long_name;
+		d->is_device = is_output_device(output_format->priv_class);
 		d->mime_type = output_format->mime_type;
 		d->extensions = output_format->extensions;
 		d->codec_tags = output_format->codec_tag;
@@ -305,6 +332,38 @@ const struct ff_format_desc *ff_format_supported()
 		if (current != NULL) {
 			current->next = d;
 			current = d;
+		} else {
+			desc = current = d;
+		}
+	}
+
+	return desc;
+}
+
+const struct ff_format_desc *ff_device_supported()
+{
+	AVOutputFormat *       output_format = NULL;
+	struct ff_format_desc *desc          = NULL;
+	struct ff_format_desc *current       = NULL;
+
+	while ((output_format = av_oformat_next(output_format)) != NULL) {
+		struct ff_format_desc *d;
+		 if (!is_output_device(output_format->priv_class))
+			continue;
+
+		d = av_mallocz(sizeof(struct ff_format_desc));
+
+		d->audio_codec = output_format->audio_codec;
+		d->video_codec = output_format->video_codec;
+		d->name        = output_format->name;
+		d->long_name   = output_format->long_name;
+		d->mime_type   = output_format->mime_type;
+		d->extensions  = output_format->extensions;
+		d->codec_tags  = output_format->codec_tag;
+
+		if (current != NULL) {
+			current->next = d;
+			current       = d;
 		} else {
 			desc = current = d;
 		}
@@ -329,6 +388,23 @@ const char *ff_format_desc_long_name(const struct ff_format_desc *format_desc)
 		return NULL;
 }
 
+
+const char *ff_device_desc_name(const struct ff_device_desc *device_desc)
+{
+	if (device_desc != NULL)
+		return device_desc->name;
+	else
+		return NULL;
+}
+
+const char *ff_device_desc_long_name(const struct ff_device_desc *device_desc)
+{
+	if (device_desc != NULL)
+		return device_desc->long_name;
+	else
+		return NULL;
+}
+
 const char *ff_format_desc_mime_type(const struct ff_format_desc *format_desc)
 {
 	if (format_desc != NULL)
@@ -343,6 +419,14 @@ const char *ff_format_desc_extensions(const struct ff_format_desc *format_desc)
 		return format_desc->extensions;
 	else
 		return NULL;
+}
+
+const bool ff_format_desc_is_device(const struct ff_format_desc *format_desc)
+{
+	if (format_desc != NULL)
+		return format_desc->is_device;
+	else
+		return false;
 }
 
 bool ff_format_desc_has_audio(const struct ff_format_desc *format_desc)
@@ -386,6 +470,15 @@ const struct ff_format_desc *ff_format_desc_next(
 		return NULL;
 }
 
+const struct ff_device_desc *ff_device_desc_next(
+	const struct ff_device_desc *device_desc)
+{
+	if (device_desc != NULL)
+		return device_desc->next;
+	else
+		return NULL;
+}
+
 static const char *get_encoder_name(const struct ff_format_desc *format_desc,
 		enum AVCodecID codec_id)
 {
@@ -420,6 +513,16 @@ void ff_format_desc_free(const struct ff_format_desc *format_desc)
 	const struct ff_format_desc *desc = format_desc;
 	while(desc != NULL) {
 		const struct ff_format_desc *next = desc->next;
+		av_free((void *)desc);
+		desc = next;
+	}
+}
+
+void ff_device_desc_free(const struct ff_device_desc *format_desc)
+{
+	const struct ff_device_desc *desc = format_desc;
+	while (desc != NULL) {
+		const struct ff_device_desc *next = desc->next;
 		av_free((void *)desc);
 		desc = next;
 	}
