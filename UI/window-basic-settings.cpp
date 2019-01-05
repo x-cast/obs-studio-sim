@@ -60,16 +60,19 @@ static bool StringEquals(QString left, QString right)
 struct FormatDesc {
 	const char *name = nullptr;
 	const char *mimeType = nullptr;
+	const bool isDevice = false;
 	const ff_format_desc *desc = nullptr;
 
 	inline FormatDesc() = default;
 	inline FormatDesc(const char *name, const char *mimeType,
-			const ff_format_desc *desc = nullptr)
-			: name(name), mimeType(mimeType), desc(desc) {}
-
+		const bool isDevice, const ff_format_desc *desc = nullptr)
+		: name(name), mimeType(mimeType), isDevice(isDevice), desc(desc) {}
+	inline FormatDesc(const char *name, const char *mimeType,
+		const ff_format_desc *desc = nullptr)
+		: name(name), mimeType(mimeType), desc(desc) {}
 	bool operator==(const FormatDesc &f) const
 	{
-		if (!StringEquals(name, f.name))
+		if (!StringEquals(name, f.name) || f.isDevice != isDevice)
 			return false;
 		return StringEquals(mimeType, f.mimeType);
 	}
