@@ -261,7 +261,7 @@ private:
 		bool enableEncode = false);
 
 	/* audio */
-	void LoadListValues(QComboBox *widget, obs_property_t *prop, int index);
+	void LoadListValues(QComboBox *widget, obs_property_t *prop, int index, bool isAsio);
 	void LoadAudioDevices();
 	void LoadAudioSources();
 

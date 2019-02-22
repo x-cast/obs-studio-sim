@@ -2137,7 +2137,7 @@ static inline void LoadListValue(QComboBox *widget, const char *text,
 }
 
 void OBSBasicSettings::LoadListValues(QComboBox *widget, obs_property_t *prop,
-		int index)
+		int index, bool isAsio)
 {
 	size_t count = obs_property_list_item_count(prop);
 
@@ -2164,7 +2164,7 @@ void OBSBasicSettings::LoadListValues(QComboBox *widget, obs_property_t *prop,
 		int idx = widget->findData(var);
 		if (idx != -1) {
 			widget->setCurrentIndex(idx);
-		} else {
+		} else if (isAsio) {
 			widget->insertItem(0,
 					QTStr("Basic.Settings.Audio."
 						"UnknownAudioDevice"),
@@ -2187,21 +2187,34 @@ void OBSBasicSettings::LoadAudioDevices()
 	obs_properties_t *input_props = obs_get_source_properties(input_id);
 	obs_properties_t *output_props = obs_get_source_properties(output_id);
 
+	// load asio devices
+	const char *asio_id = "asio_input_capture";
+	obs_properties_t *asio_input_props = obs_get_source_properties(asio_id);
+
 	if (input_props) {
 		obs_property_t *inputs  = obs_properties_get(input_props,
 				"device_id");
-		LoadListValues(ui->auxAudioDevice1, inputs, 3);
-		LoadListValues(ui->auxAudioDevice2, inputs, 4);
-		LoadListValues(ui->auxAudioDevice3, inputs, 5);
-		LoadListValues(ui->auxAudioDevice4, inputs, 6);
+		LoadListValues(ui->auxAudioDevice1, inputs, 3, false);
+		LoadListValues(ui->auxAudioDevice2, inputs, 4, false);
+		LoadListValues(ui->auxAudioDevice3, inputs, 5, false);
+		LoadListValues(ui->auxAudioDevice4, inputs, 6, false);
 		obs_properties_destroy(input_props);
+	}
+	if (asio_input_props) {
+		obs_property_t *inputs = obs_properties_get(asio_input_props,
+				"device_id");
+		LoadListValues(ui->auxAudioDevice1, inputs, 3, true);
+		LoadListValues(ui->auxAudioDevice2, inputs, 4, true);
+		LoadListValues(ui->auxAudioDevice3, inputs, 5, true);
+		LoadListValues(ui->auxAudioDevice4, inputs, 6, true);
+		obs_properties_destroy(asio_input_props);
 	}
 
 	if (output_props) {
 		obs_property_t *outputs = obs_properties_get(output_props,
 				"device_id");
-		LoadListValues(ui->desktopAudioDevice1, outputs, 1);
-		LoadListValues(ui->desktopAudioDevice2, outputs, 2);
+		LoadListValues(ui->desktopAudioDevice1, outputs, 1, false);
+		LoadListValues(ui->desktopAudioDevice2, outputs, 2, false);
 		obs_properties_destroy(output_props);
 	}
 }
@@ -3629,11 +3642,19 @@ void OBSBasicSettings::SaveAudioSettings()
 	auto UpdateAudioDevice = [this](bool input, QComboBox *combo,
 			const char *name, int index)
 	{
-		main->ResetAudioDevice(
-				input ? App()->InputAudioSource()
-				      : App()->OutputAudioSource(),
-				QT_TO_UTF8(GetComboData(combo)),
-				Str(name), index);
+		if (input) {
+			main->ResetAudioDevice(App()->InputAudioSource(),
+					QT_TO_UTF8(GetComboData(combo)),
+					Str(name), index);
+			main->ResetAudioDevice("asio_input_capture",
+					QT_TO_UTF8(GetComboData(combo)),
+					Str(name), index);
+		}
+		else {
+			main->ResetAudioDevice(App()->OutputAudioSource(),
+					QT_TO_UTF8(GetComboData(combo)),
+					Str(name), index);
+		}
 	};
 
 	UpdateAudioDevice(false, ui->desktopAudioDevice1,
