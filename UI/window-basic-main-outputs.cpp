@@ -1055,6 +1055,7 @@ struct AdvancedOutput : BasicOutputHandler {
 	OBSEncoder             streamAudioEnc;
 
 	bool                   ffmpegOutput;
+	bool                   ffmpegStreaming;
 	bool                   ffmpegRecording;
 	bool                   useStreamEncoder;
 	bool                   usesBitrate = false;
@@ -1063,14 +1064,16 @@ struct AdvancedOutput : BasicOutputHandler {
 
 	AdvancedOutput(OBSBasic *main_);
 
-	inline void UpdateStreamSettings();
-	inline void UpdateRecordingSettings();
+	inline void UpdateStandardStreamSettings();
+//	inline void UpdateFFmpegStreamSettings();
+	inline void UpdateStandardRecordingSettings();
 	inline void UpdateAudioSettings();
 	virtual void Update() override;
 
-	inline void SetupStreaming();
-	inline void SetupRecording();
-	inline void SetupFFmpeg();
+	inline void SetupStandardStreaming();
+	inline void SetupStandardRecording();
+	inline void SetupFFmpegStreaming();
+	inline void SetupFFmpegRecording();
 	void SetupOutputs();
 	int GetAudioBitrate(size_t i) const;
 
@@ -1118,6 +1121,9 @@ static void ApplyEncoderDefaults(OBSData &settings,
 
 AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 {
+	const char *streamType = config_get_string(main->Config(), "AdvOut",
+			"StreamType");
+	ffmpegStreaming = astrcmpi(streamType, "FFmpeg") == 0;
 	const char *recType = config_get_string(main->Config(), "AdvOut",
 			"RecType");
 	const char *streamEncoder = config_get_string(main->Config(), "AdvOut",
@@ -1125,9 +1131,8 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 	const char *recordEncoder = config_get_string(main->Config(), "AdvOut",
 			"RecEncoder");
 
-	ffmpegOutput = astrcmpi(recType, "FFmpeg") == 0;
-	ffmpegRecording = ffmpegOutput &&
-		config_get_bool(main->Config(), "AdvOut", "FFOutputToFile");
+	ffmpegRecording = astrcmpi(recType, "FFmpeg") == 0;
+
 	useStreamEncoder = astrcmpi(recordEncoder, "none") == 0;
 
 	OBSData streamEncSettings = GetDataFromJsonFile("streamEncoder.json");
@@ -1142,9 +1147,9 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 	              astrcmpi(rate_control, "VBR") == 0 ||
 	              astrcmpi(rate_control, "ABR") == 0;
 
-	if (ffmpegOutput) {
+	if (ffmpegRecording) {
 		fileOutput = obs_output_create("ffmpeg_output",
-				"adv_ffmpeg_output", nullptr, nullptr);
+				"adv_ffmpeg_rec_output", nullptr, nullptr);
 		if (!fileOutput)
 			throw "Failed to create recording FFmpeg output "
 			      "(advanced output)";
@@ -1195,22 +1200,32 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 		}
 	}
 
-	h264Streaming = obs_video_encoder_create(streamEncoder,
-			"streaming_h264", streamEncSettings, nullptr);
-	if (!h264Streaming)
-		throw "Failed to create streaming h264 encoder "
-		      "(advanced output)";
-	obs_encoder_release(h264Streaming);
+	if (ffmpegStreaming) {
+		streamOutput = obs_output_create("ffmpeg_output",
+				"adv_ffmpeg_stream_output", nullptr, nullptr);
+		if (!fileOutput)
+			throw "Failed to create streaming FFmpeg output "
+				"(advanced output)";
+		obs_output_release(streamOutput);
+	} else {
+		h264Streaming = obs_video_encoder_create(streamEncoder,
+				"streaming_h264", streamEncSettings, nullptr);
+		if (!h264Streaming)
+			throw "Failed to create streaming h264 encoder "
+				"(advanced output)";
+		obs_encoder_release(h264Streaming);
 
-	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
-		char name[9];
-		sprintf(name, "adv_aac%d", i);
+		for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
+			char name[9];
+			sprintf(name, "adv_aac%d", i);
 
-		if (!CreateAACEncoder(aacTrack[i], aacEncoderID[i],
-					GetAudioBitrate(i), name, i))
-			throw "Failed to create audio encoder "
-			      "(advanced output)";
+			if (!CreateAACEncoder(aacTrack[i], aacEncoderID[i],
+				GetAudioBitrate(i), name, i))
+				throw "Failed to create audio encoder "
+					"(advanced output)";
+		}
 	}
+
 
 	startRecording.Connect(obs_output_get_signal_handler(fileOutput),
 			"start", OBSStartRecording, this);
@@ -1220,7 +1235,7 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 			"stopping", OBSRecordStopping, this);
 }
 
-void AdvancedOutput::UpdateStreamSettings()
+void AdvancedOutput::UpdateStandardStreamSettings()
 {
 	bool applyServiceSettings = config_get_bool(main->Config(), "AdvOut",
 			"ApplyServiceSettings");
@@ -1242,7 +1257,7 @@ void AdvancedOutput::UpdateStreamSettings()
 	obs_encoder_update(h264Streaming, settings);
 }
 
-inline void AdvancedOutput::UpdateRecordingSettings()
+inline void AdvancedOutput::UpdateStandardRecordingSettings()
 {
 	OBSData settings = GetDataFromJsonFile("recordEncoder.json");
 	obs_encoder_update(h264Recording, settings);
@@ -1250,18 +1265,22 @@ inline void AdvancedOutput::UpdateRecordingSettings()
 
 void AdvancedOutput::Update()
 {
-	UpdateStreamSettings();
-	if (!useStreamEncoder && !ffmpegOutput)
-		UpdateRecordingSettings();
-	UpdateAudioSettings();
+	if (ffmpegStreaming)
+		;// UpdateFFmpegStreamSettings();
+	else
+		UpdateStandardStreamSettings();
+	if (!useStreamEncoder && !ffmpegRecording)
+		UpdateStandardRecordingSettings();
+	if (!ffmpegStreaming)
+		UpdateAudioSettings();
 }
 
-inline void AdvancedOutput::SetupStreaming()
+inline void AdvancedOutput::SetupStandardStreaming()
 {
-	bool rescale = config_get_bool(main->Config(), "AdvOut",
-			"Rescale");
+	bool rescale = config_get_bool(main->Config(), "AdvOut", "Rescale");
 	const char *rescaleRes = config_get_string(main->Config(), "AdvOut",
 			"RescaleRes");
+
 	uint32_t caps = obs_encoder_get_caps(h264Streaming);
 	unsigned int cx = 0;
 	unsigned int cy = 0;
@@ -1281,7 +1300,7 @@ inline void AdvancedOutput::SetupStreaming()
 	obs_encoder_set_video(h264Streaming, obs_get_video());
 }
 
-inline void AdvancedOutput::SetupRecording()
+inline void AdvancedOutput::SetupStandardRecording()
 {
 	const char *path = config_get_string(main->Config(), "AdvOut",
 			"RecFilePath");
@@ -1342,9 +1361,75 @@ inline void AdvancedOutput::SetupRecording()
 	obs_data_release(settings);
 }
 
-inline void AdvancedOutput::SetupFFmpeg()
+inline void AdvancedOutput::SetupFFmpegStreaming()
 {
 	const char *url = config_get_string(main->Config(), "AdvOut", "FFURL");
+	int vBitrate = config_get_int(main->Config(), "AdvOut",
+			"StreamFFVBitrate");
+	int gopSize = config_get_int(main->Config(), "AdvOut",
+			"StreamFFVGOPSize");
+	bool rescale = config_get_bool(main->Config(), "AdvOut",
+			"StreamFFRescale");
+	const char *rescaleRes = config_get_string(main->Config(), "AdvOut",
+			"StreamFFRescaleRes");
+	const char *formatName = config_get_string(main->Config(), "AdvOut",
+			"StreamFFFormat");
+	const char *mimeType = config_get_string(main->Config(), "AdvOut",
+			"StreamFFFormatMimeType");
+	const char *muxCustom = config_get_string(main->Config(), "AdvOut",
+			"StreamFFMCustom");
+	const char *vEncoder = config_get_string(main->Config(), "AdvOut",
+			"StreamFFVEncoder");
+	int vEncoderId = config_get_int(main->Config(), "AdvOut",
+			"StreamFFVEncoderId");
+	const char *vEncCustom = config_get_string(main->Config(), "AdvOut",
+			"StreamFFVCustom");
+	int aBitrate = config_get_int(main->Config(), "AdvOut",
+			"StreamFFABitrate");
+	int aMixes = config_get_int(main->Config(), "AdvOut",
+			"StreamFFAudioMixes");
+	const char *aEncoder = config_get_string(main->Config(), "AdvOut",
+			"StreamFFAEncoder");
+	int aEncoderId = config_get_int(main->Config(), "AdvOut",
+			"StreamFFAEncoderId");
+	const char *aEncCustom = config_get_string(main->Config(), "AdvOut",
+			"StreamFFACustom");
+	obs_data_t *settings = obs_data_create();
+
+	obs_data_set_string(settings, "url", url);
+	obs_data_set_string(settings, "format_name", formatName);
+	obs_data_set_string(settings, "format_mime_type", mimeType);
+	obs_data_set_string(settings, "muxer_settings", muxCustom);
+	obs_data_set_int(settings, "gop_size", gopSize);
+	obs_data_set_int(settings, "video_bitrate", vBitrate);
+	obs_data_set_string(settings, "video_encoder", vEncoder);
+	obs_data_set_int(settings, "video_encoder_id", vEncoderId);
+	obs_data_set_string(settings, "video_settings", vEncCustom);
+	obs_data_set_int(settings, "audio_bitrate", aBitrate);
+	obs_data_set_string(settings, "audio_encoder", aEncoder);
+	obs_data_set_int(settings, "audio_encoder_id", aEncoderId);
+	obs_data_set_string(settings, "audio_settings", aEncCustom);
+
+	if (rescale && rescaleRes && *rescaleRes) {
+		int width;
+		int height;
+		int val = sscanf(rescaleRes, "%dx%d", &width, &height);
+
+		if (val == 2 && width && height) {
+			obs_data_set_int(settings, "scale_width", width);
+			obs_data_set_int(settings, "scale_height", height);
+		}
+	}
+
+	obs_output_set_mixers(streamOutput, aMixes);
+	obs_output_set_media(streamOutput, obs_get_video(), obs_get_audio());
+	obs_output_update(streamOutput, settings);
+
+	obs_data_release(settings);
+}
+
+inline void AdvancedOutput::SetupFFmpegRecording()
+{
 	int vBitrate = config_get_int(main->Config(), "AdvOut",
 			"FFVBitrate");
 	int gopSize = config_get_int(main->Config(), "AdvOut",
@@ -1377,7 +1462,6 @@ inline void AdvancedOutput::SetupFFmpeg()
 			"FFACustom");
 	obs_data_t *settings = obs_data_create();
 
-	obs_data_set_string(settings, "url", url);
 	obs_data_set_string(settings, "format_name", formatName);
 	obs_data_set_string(settings, "format_mime_type", mimeType);
 	obs_data_set_string(settings, "muxer_settings", muxCustom);
@@ -1452,18 +1536,23 @@ inline void AdvancedOutput::UpdateAudioSettings()
 
 void AdvancedOutput::SetupOutputs()
 {
-	obs_encoder_set_video(h264Streaming, obs_get_video());
-	if (h264Recording)
-		obs_encoder_set_video(h264Recording, obs_get_video());
-	for (size_t i = 0; i < MAX_AUDIO_MIXES; i++)
-		obs_encoder_set_audio(aacTrack[i], obs_get_audio());
+	if (!ffmpegStreaming) {
+		obs_encoder_set_video(h264Streaming, obs_get_video());
+		if (h264Recording)
+			obs_encoder_set_video(h264Recording, obs_get_video());
+		for (size_t i = 0; i < MAX_AUDIO_MIXES; i++)
+			obs_encoder_set_audio(aacTrack[i], obs_get_audio());
+	}
 
-	SetupStreaming();
-
-	if (ffmpegOutput)
-		SetupFFmpeg();
+	if (ffmpegStreaming)
+		SetupFFmpegStreaming();
 	else
-		SetupRecording();
+		SetupStandardStreaming();
+
+	if (ffmpegRecording)
+		SetupFFmpegRecording();
+	else
+		SetupStandardRecording();
 }
 
 int AdvancedOutput::GetAudioBitrate(size_t i) const
@@ -1479,166 +1568,186 @@ int AdvancedOutput::GetAudioBitrate(size_t i) const
 
 bool AdvancedOutput::StartStreaming(obs_service_t *service)
 {
+	const char *type;
+	int trackIndex;
 	if (!useStreamEncoder ||
-	    (!ffmpegOutput && !obs_output_active(fileOutput))) {
-		UpdateStreamSettings();
+	    (!ffmpegRecording && !obs_output_active(fileOutput))) {
+		if (!ffmpegStreaming)
+			UpdateStandardStreamSettings();
 	}
-
-	UpdateAudioSettings();
+	if (!ffmpegStreaming)
+		UpdateAudioSettings();
 
 	if (!Active())
 		SetupOutputs();
 
-	Auth *auth = main->GetAuth();
-	if (auth)
-		auth->OnStreamConfig();
+	if (!ffmpegStreaming) {
+		Auth *auth = main->GetAuth();
+		if (auth)
+			auth->OnStreamConfig();
 
-	/* --------------------- */
+		/* --------------------- */
 
-	int trackIndex = config_get_int(main->Config(), "AdvOut",
-			"TrackIndex");
+		trackIndex = config_get_int(main->Config(), "AdvOut",
+				"TrackIndex");
 
-	const char *type = obs_service_get_output_type(service);
-	if (!type)
-		type = "rtmp_output";
+		type = obs_service_get_output_type(service);
+		if (!type)
+			type = "rtmp_output";
 
-	/* XXX: this is messy and disgusting and should be refactored */
-	if (outputType != type) {
-		streamDelayStarting.Disconnect();
-		streamStopping.Disconnect();
-		startStreaming.Disconnect();
-		stopStreaming.Disconnect();
+		/* XXX: this is messy and disgusting and should be refactored */
+		if (outputType != type) {
+			streamDelayStarting.Disconnect();
+			streamStopping.Disconnect();
+			startStreaming.Disconnect();
+			stopStreaming.Disconnect();
 
-		streamOutput = obs_output_create(type, "adv_stream",
+			streamOutput = obs_output_create(type, "adv_stream",
 				nullptr, nullptr);
-		if (!streamOutput) {
-			blog(LOG_WARNING, "Creation of stream output type '%s' "
+			if (!streamOutput) {
+				blog(LOG_WARNING, "Creation of stream output type '%s' "
 					"failed!", type);
-			return false;
-		}
-		obs_output_release(streamOutput);
-
-		streamDelayStarting.Connect(
-				obs_output_get_signal_handler(streamOutput),
-				"starting", OBSStreamStarting, this);
-		streamStopping.Connect(
-				obs_output_get_signal_handler(streamOutput),
-				"stopping", OBSStreamStopping, this);
-
-		startStreaming.Connect(
-				obs_output_get_signal_handler(streamOutput),
-				"start", OBSStartStreaming, this);
-		stopStreaming.Connect(
-				obs_output_get_signal_handler(streamOutput),
-				"stop", OBSStopStreaming, this);
-
-		const char *codec =
-			obs_output_get_supported_audio_codecs(streamOutput);
-		if (!codec) {
-			return false;
-		}
-
-		if (strcmp(codec, "aac") == 0) {
-			streamAudioEnc = aacTrack[trackIndex - 1];
-		} else {
-			const char *id = FindAudioEncoderFromCodec(codec);
-			int audioBitrate = GetAudioBitrate(trackIndex - 1);
-			obs_data_t *settings = obs_data_create();
-			obs_data_set_int(settings, "bitrate", audioBitrate);
-
-			streamAudioEnc = obs_audio_encoder_create(id,
-					"alt_audio_enc", nullptr,
-					trackIndex - 1, nullptr);
-			if (!streamAudioEnc)
 				return false;
+			}
+			obs_output_release(streamOutput);
 
-			obs_encoder_update(streamAudioEnc, settings);
-			obs_encoder_set_audio(streamAudioEnc, obs_get_audio());
+		}
+	}
+	streamDelayStarting.Connect(obs_output_get_signal_handler(streamOutput),
+			"starting", OBSStreamStarting, this);
+	streamStopping.Connect(obs_output_get_signal_handler(streamOutput),
+			"stopping", OBSStreamStopping, this);
 
-			obs_data_release(settings);
+	startStreaming.Connect(obs_output_get_signal_handler(streamOutput),
+			"start", OBSStartStreaming, this);
+	stopStreaming.Connect(obs_output_get_signal_handler(streamOutput),
+			"stop", OBSStopStreaming, this);
+
+	if (!ffmpegStreaming) {
+		if (outputType != type) {
+			const char *codec =
+				obs_output_get_supported_audio_codecs(streamOutput);
+			if (!codec) {
+				return false;
+			}
+
+			if (strcmp(codec, "aac") == 0) {
+				streamAudioEnc = aacTrack[trackIndex - 1];
+			}
+			else {
+				const char *id = FindAudioEncoderFromCodec(codec);
+				int audioBitrate = GetAudioBitrate(trackIndex - 1);
+				obs_data_t *settings = obs_data_create();
+				obs_data_set_int(settings, "bitrate", audioBitrate);
+
+				streamAudioEnc = obs_audio_encoder_create(id,
+						"alt_audio_enc", nullptr,
+						trackIndex - 1, nullptr);
+				if (!streamAudioEnc)
+					return false;
+
+				obs_encoder_update(streamAudioEnc, settings);
+				obs_encoder_set_audio(streamAudioEnc, obs_get_audio());
+
+				obs_data_release(settings);
+			}
+
+			outputType = type;
 		}
 
-		outputType = type;
-	}
+		obs_output_set_video_encoder(streamOutput, h264Streaming);
+		obs_output_set_audio_encoder(streamOutput, streamAudioEnc, 0);
 
-	obs_output_set_video_encoder(streamOutput, h264Streaming);
-	obs_output_set_audio_encoder(streamOutput, streamAudioEnc, 0);
+		/* --------------------- */
 
-	/* --------------------- */
+		obs_output_set_service(streamOutput, service);
 
-	obs_output_set_service(streamOutput, service);
+		bool reconnect = config_get_bool(main->Config(), "Output", "Reconnect");
+		int retryDelay = config_get_int(main->Config(), "Output", "RetryDelay");
+		int maxRetries = config_get_int(main->Config(), "Output", "MaxRetries");
+		bool useDelay = config_get_bool(main->Config(), "Output",
+				"DelayEnable");
+		int delaySec = config_get_int(main->Config(), "Output",
+				"DelaySec");
+		bool preserveDelay = config_get_bool(main->Config(), "Output",
+				"DelayPreserve");
+		const char *bindIP = config_get_string(main->Config(), "Output",
+				"BindIP");
+		bool enableNewSocketLoop = config_get_bool(main->Config(), "Output",
+				"NewSocketLoopEnable");
+		bool enableLowLatencyMode = config_get_bool(main->Config(), "Output",
+				"LowLatencyEnable");
+		bool dynamicBitrate = config_get_bool(main->Config(), "AdvOut",
+				"DynamicBitrate");
+		int dynamicBitrateDown = config_get_int(main->Config(), "AdvOut",
+				"DynamicBitrateDown");
+		int dynamicBitrateUp = config_get_int(main->Config(), "AdvOut",
+				"DynamicBitrateUp");
+		int dynamicBitrateThreshold = config_get_int(main->Config(), "AdvOut",
+				"DynamicBitrateThreshold");
+		int dynamicBitrateRecoveryTime = config_get_int(main->Config(), "AdvOut",
+				"DynamicBitrateRecoveryTime");
+		int dynamicBitrateDecreaseTime = config_get_int(main->Config(), "AdvOut",
+				"DynamicBitrateDecreaseTime");
+		int dynamicBitrateFloor = config_get_int(main->Config(), "AdvOut",
+				"DynamicBitrateFloor");
 
-	bool reconnect = config_get_bool(main->Config(), "Output", "Reconnect");
-	int retryDelay = config_get_int(main->Config(), "Output", "RetryDelay");
-	int maxRetries = config_get_int(main->Config(), "Output", "MaxRetries");
-	bool useDelay = config_get_bool(main->Config(), "Output",
-			"DelayEnable");
-	int delaySec = config_get_int(main->Config(), "Output",
-			"DelaySec");
-	bool preserveDelay = config_get_bool(main->Config(), "Output",
-			"DelayPreserve");
-	const char *bindIP = config_get_string(main->Config(), "Output",
-			"BindIP");
-	bool enableNewSocketLoop = config_get_bool(main->Config(), "Output",
-			"NewSocketLoopEnable");
-	bool enableLowLatencyMode = config_get_bool(main->Config(), "Output",
-			"LowLatencyEnable");
-	bool dynamicBitrate = config_get_bool(main->Config(), "AdvOut",
-			"DynamicBitrate");
-	int dynamicBitrateDown = config_get_int(main->Config(), "AdvOut",
-			"DynamicBitrateDown");
-	int dynamicBitrateUp = config_get_int(main->Config(), "AdvOut",
-			"DynamicBitrateUp");
-	int dynamicBitrateThreshold = config_get_int(main->Config(), "AdvOut",
-			"DynamicBitrateThreshold");
-	int dynamicBitrateRecoveryTime = config_get_int(main->Config(), "AdvOut",
-			"DynamicBitrateRecoveryTime");
-	int dynamicBitrateDecreaseTime = config_get_int(main->Config(), "AdvOut",
-			"DynamicBitrateDecreaseTime");
-	int dynamicBitrateFloor = config_get_int(main->Config(), "AdvOut",
-			"DynamicBitrateFloor");
+		obs_data_t *settings = obs_data_create();
+		obs_data_set_string(settings, "bind_ip", bindIP);
+		obs_data_set_bool(settings, "new_socket_loop_enabled",
+				enableNewSocketLoop);
+		obs_data_set_bool(settings, "low_latency_mode_enabled",
+				enableLowLatencyMode);
+		obs_data_set_bool(settings, "DynamicBitrate", dynamicBitrate);
+		obs_data_set_int(settings, "DynamicBitrateDown", dynamicBitrateDown);
+		obs_data_set_int(settings, "DynamicBitrateUp", dynamicBitrateUp);
+		obs_data_set_int(settings, "DynamicBitrateThreshold",
+				dynamicBitrateThreshold);
+		obs_data_set_int(settings, "DynamicBitrateRecoveryTime",
+				dynamicBitrateRecoveryTime);
+		obs_data_set_int(settings, "DynamicBitrateDecreaseTime",
+				dynamicBitrateDecreaseTime);
+		obs_data_set_int(settings, "DynamicBitrateFloor", dynamicBitrateFloor);
+		obs_output_update(streamOutput, settings);
+		obs_data_release(settings);
 
-	obs_data_t *settings = obs_data_create();
-	obs_data_set_string(settings, "bind_ip", bindIP);
-	obs_data_set_bool(settings, "new_socket_loop_enabled",
-			enableNewSocketLoop);
-	obs_data_set_bool(settings, "low_latency_mode_enabled",
-			enableLowLatencyMode);
-	obs_data_set_bool(settings, "DynamicBitrate", dynamicBitrate);
-	obs_data_set_int(settings, "DynamicBitrateDown", dynamicBitrateDown);
-	obs_data_set_int(settings, "DynamicBitrateUp", dynamicBitrateUp);
-	obs_data_set_int(settings, "DynamicBitrateThreshold",
-			dynamicBitrateThreshold);
-	obs_data_set_int(settings, "DynamicBitrateRecoveryTime",
-			dynamicBitrateRecoveryTime);
-	obs_data_set_int(settings, "DynamicBitrateDecreaseTime",
-			dynamicBitrateDecreaseTime);
-	obs_data_set_int(settings, "DynamicBitrateFloor", dynamicBitrateFloor);
+		if (!reconnect)
+			maxRetries = 0;
 
-	obs_output_update(streamOutput, settings);
-	obs_data_release(settings);
+		obs_output_set_delay(streamOutput, useDelay ? delaySec : 0,
+				preserveDelay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
 
-	if (!reconnect)
-		maxRetries = 0;
+		obs_output_set_reconnect_settings(streamOutput, maxRetries,
+				retryDelay);
 
-	obs_output_set_delay(streamOutput, useDelay ? delaySec : 0,
-			preserveDelay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
+		if (obs_output_start(streamOutput)) {
+			return true;
+		}
 
-	obs_output_set_reconnect_settings(streamOutput, maxRetries,
-			retryDelay);
+		const char *error = obs_output_get_last_error(streamOutput);
+		bool has_last_error = error && *error;
 
-	if (obs_output_start(streamOutput)) {
+		blog(LOG_WARNING, "Stream output type '%s' failed to start!%s%s",
+				type,
+				has_last_error ? "  Last Error: " : "",
+				has_last_error ? error : "");
+		return false;
+	} else {
+		if (!obs_output_start(streamOutput)) {
+			QString error_reason;
+			const char *error = obs_output_get_last_error(streamOutput);
+			if (error && *error)
+				error_reason = QT_UTF8(error);
+			else
+				error_reason = QTStr("Output.StartFailedGeneric");
+			QMessageBox::critical(main,
+					QTStr("Output.StartStreamFailed"),
+					error_reason);
+			return false;
+		}
 		return true;
 	}
 
-	const char *error = obs_output_get_last_error(streamOutput);
-	bool has_last_error = error && *error;
-
-	blog(LOG_WARNING, "Stream output type '%s' failed to start!%s%s",
-			type,
-			has_last_error ? "  Last Error: " : "",
-			has_last_error ? error : "");
-	return false;
 }
 
 bool AdvancedOutput::StartRecording()
@@ -1649,70 +1758,62 @@ bool AdvancedOutput::StartRecording()
 	bool noSpace = false;
 	bool overwriteIfExists = false;
 
-	if (!useStreamEncoder) {
-		if (!ffmpegOutput) {
-			UpdateRecordingSettings();
-		}
-	} else if (!obs_output_active(streamOutput)) {
-		UpdateStreamSettings();
-	}
+	if (!useStreamEncoder && !ffmpegRecording)
+		UpdateStandardRecordingSettings();
+	else if (!obs_output_active(streamOutput) && !ffmpegStreaming)
+		UpdateStandardStreamSettings();
 
-	UpdateAudioSettings();
+	if (!ffmpegStreaming)
+		UpdateAudioSettings();
 
 	if (!Active())
 		SetupOutputs();
 
-	if (!ffmpegOutput || ffmpegRecording) {
-		path = config_get_string(main->Config(), "AdvOut",
-				ffmpegRecording ? "FFFilePath" : "RecFilePath");
-		recFormat = config_get_string(main->Config(), "AdvOut",
-				ffmpegRecording ? "FFExtension" : "RecFormat");
-		filenameFormat = config_get_string(main->Config(), "Output",
-				"FilenameFormatting");
-		overwriteIfExists = config_get_bool(main->Config(), "Output",
-				"OverwriteIfExists");
-		noSpace = config_get_bool(main->Config(), "AdvOut",
-				ffmpegRecording ?
-				"FFFileNameWithoutSpace" :
-				"RecFileNameWithoutSpace");
+	path = config_get_string(main->Config(), "AdvOut",
+			ffmpegRecording ? "FFFilePath" : "RecFilePath");
+	recFormat = config_get_string(main->Config(), "AdvOut",
+			ffmpegRecording ? "FFExtension" : "RecFormat");
+	filenameFormat = config_get_string(main->Config(), "Output",
+			"FilenameFormatting");
+	overwriteIfExists = config_get_bool(main->Config(), "Output",
+			"OverwriteIfExists");
+	noSpace = config_get_bool(main->Config(), "AdvOut",
+			ffmpegRecording ?
+			"FFFileNameWithoutSpace" : "RecFileNameWithoutSpace");
 
-		os_dir_t *dir = path && path[0] ? os_opendir(path) : nullptr;
+	os_dir_t *dir = path && path[0] ? os_opendir(path) : nullptr;
 
-		if (!dir) {
-			if (main->isVisible())
-				OBSMessageBox::information(main,
-						QTStr("Output.BadPath.Title"),
-						QTStr("Output.BadPath.Text"));
-			else
-				main->SysTrayNotify(QTStr("Output.BadPath.Text"),
-						QSystemTrayIcon::Warning);
-			return false;
-		}
-
-		os_closedir(dir);
-
-		string strPath;
-		strPath += path;
-
-		char lastChar = strPath.back();
-		if (lastChar != '/' && lastChar != '\\')
-			strPath += "/";
-
-		strPath += GenerateSpecifiedFilename(recFormat, noSpace,
-							filenameFormat);
-		ensure_directory_exists(strPath);
-		if (!overwriteIfExists)
-			FindBestFilename(strPath, noSpace);
-
-		obs_data_t *settings = obs_data_create();
-		obs_data_set_string(settings,
-				ffmpegRecording ? "url" : "path",
-				strPath.c_str());
-
-		obs_output_update(fileOutput, settings);
-
-		obs_data_release(settings);
+	if (!dir) {
+		if (main->isVisible())
+			OBSMessageBox::information(main,
+				QTStr("Output.BadPath.Title"),
+				QTStr("Output.BadPath.Text"));
+		else
+			main->SysTrayNotify(QTStr("Output.BadPath.Text"),
+				QSystemTrayIcon::Warning);
+		return false;
 	}
+	os_closedir(dir);
+
+	string strPath;
+	strPath += path;
+
+	char lastChar = strPath.back();
+	if (lastChar != '/' && lastChar != '\\')
+		strPath += "/";
+
+	strPath += GenerateSpecifiedFilename(recFormat, noSpace,
+			filenameFormat);
+	ensure_directory_exists(strPath);
+	if (!overwriteIfExists)
+		FindBestFilename(strPath, noSpace);
+
+	obs_data_t *settings = obs_data_create();
+	obs_data_set_string(settings, ffmpegRecording ? "url" : "path",
+			strPath.c_str());
+
+	obs_output_update(fileOutput, settings);
+	obs_data_release(settings);
 
 	if (!obs_output_start(fileOutput)) {
 		QString error_reason;
@@ -1744,9 +1845,9 @@ bool AdvancedOutput::StartReplayBuffer()
 
 	if (!useStreamEncoder) {
 		if (!ffmpegOutput)
-			UpdateRecordingSettings();
+			UpdateStandardRecordingSettings();
 	} else if (!obs_output_active(streamOutput)) {
-		UpdateStreamSettings();
+		UpdateStandardStreamSettings();
 	}
 
 	UpdateAudioSettings();

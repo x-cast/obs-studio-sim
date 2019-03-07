@@ -206,8 +206,9 @@ private:
 
 	void LoadEncoderTypes();
 	void LoadColorRanges();
-	void LoadFormats();
-	void ReloadCodecs(const ff_format_desc *formatDesc);
+	void LoadFormats(QComboBox *format);
+	void ReloadCodecs(const ff_format_desc *formatDesc, QComboBox *vidEncoder,
+			QComboBox *audEncoder, QCheckBox *ignoreCompat);
 
 	void LoadGeneralSettings();
 	void LoadStream1Settings();
@@ -249,9 +250,13 @@ private:
 	void LoadAdvOutputStreamingEncoderProperties();
 	void LoadAdvOutputRecordingSettings();
 	void LoadAdvOutputRecordingEncoderProperties();
-	void LoadAdvOutputFFmpegSettings();
+	void LoadAdvOutputFFmpegRecordingSettings();
+	void LoadAdvOutputFFmpegStreamingSettings();
 	void LoadAdvOutputAudioSettings();
 	void SetAdvOutputFFmpegEnablement(
+		ff_codec_type encoderType, bool enabled,
+		bool enableEncode = false);
+	void SetAdvOutputStreamFFmpegEnablement(
 		ff_codec_type encoderType, bool enabled,
 		bool enableEncode = false);
 
@@ -301,7 +306,11 @@ private slots:
 	void on_advOutFFFormat_currentIndexChanged(int idx);
 	void on_advOutFFAEncoder_currentIndexChanged(int idx);
 	void on_advOutFFVEncoder_currentIndexChanged(int idx);
-	void on_advOutFFType_currentIndexChanged(int idx);
+	void on_advOutStreamType_currentIndexChanged(int idx);
+	void on_advOutStreamFFIgnoreCompat_stateChanged(int state);
+	void on_advOutStreamFFFormat_currentIndexChanged(int idx);
+	void on_advOutStreamFFAEncoder_currentIndexChanged(int idx);
+	void on_advOutStreamFFVEncoder_currentIndexChanged(int idx);
 
 	void on_colorFormat_currentIndexChanged(const QString &text);
 
