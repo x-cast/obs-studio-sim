@@ -1265,10 +1265,16 @@ inline void AdvancedOutput::UpdateStandardRecordingSettings()
 
 void AdvancedOutput::Update()
 {
-	if (ffmpegStreaming)
-		;// UpdateFFmpegStreamSettings();
-	else
+	if (ffmpegStreaming) {
+		int vBitrate = config_get_int(main->Config(), "AdvOut",
+				"FFVBitrate");
+		obs_data_t * settings = obs_data_create();
+		obs_data_set_int(settings, "video_bitrate", vBitrate);
+		obs_output_update(fileOutput, settings);
+		obs_data_release(settings);
+	} else {
 		UpdateStandardStreamSettings();
+	}
 	if (!useStreamEncoder && !ffmpegRecording)
 		UpdateStandardRecordingSettings();
 	if (!ffmpegStreaming)
@@ -1394,6 +1400,20 @@ inline void AdvancedOutput::SetupFFmpegStreaming()
 			"StreamFFAEncoderId");
 	const char *aEncCustom = config_get_string(main->Config(), "AdvOut",
 			"StreamFFACustom");
+	bool dynamicBitrate = config_get_bool(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrate");
+	int dynamicBitrateDown = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateDown");
+	int dynamicBitrateUp = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateUp");
+	int dynamicBitrateThreshold = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateThreshold");
+	int dynamicBitrateRecoveryTime = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateRecoveryTime");
+	int dynamicBitrateDecreaseTime = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateDecreaseTime");
+	int dynamicBitrateFloor = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateFloor");
 	obs_data_t *settings = obs_data_create();
 
 	obs_data_set_string(settings, "url", url);
@@ -1409,6 +1429,16 @@ inline void AdvancedOutput::SetupFFmpegStreaming()
 	obs_data_set_string(settings, "audio_encoder", aEncoder);
 	obs_data_set_int(settings, "audio_encoder_id", aEncoderId);
 	obs_data_set_string(settings, "audio_settings", aEncCustom);
+	obs_data_set_bool(settings, "DynamicBitrate", dynamicBitrate);
+	obs_data_set_int(settings, "DynamicBitrateDown", dynamicBitrateDown);
+	obs_data_set_int(settings, "DynamicBitrateUp", dynamicBitrateUp);
+	obs_data_set_int(settings, "DynamicBitrateThreshold",
+			dynamicBitrateThreshold);
+	obs_data_set_int(settings, "DynamicBitrateRecoveryTime",
+			dynamicBitrateRecoveryTime);
+	obs_data_set_int(settings, "DynamicBitrateDecreaseTime",
+			dynamicBitrateDecreaseTime);
+	obs_data_set_int(settings, "DynamicBitrateFloor", dynamicBitrateFloor);
 
 	if (rescale && rescaleRes && *rescaleRes) {
 		int width;
@@ -1683,14 +1713,14 @@ bool AdvancedOutput::StartStreaming(obs_service_t *service)
 				"DynamicBitrateDown");
 		int dynamicBitrateUp = config_get_int(main->Config(), "AdvOut",
 				"DynamicBitrateUp");
-		int dynamicBitrateThreshold = config_get_int(main->Config(), "AdvOut",
-				"DynamicBitrateThreshold");
-		int dynamicBitrateRecoveryTime = config_get_int(main->Config(), "AdvOut",
-				"DynamicBitrateRecoveryTime");
-		int dynamicBitrateDecreaseTime = config_get_int(main->Config(), "AdvOut",
-				"DynamicBitrateDecreaseTime");
-		int dynamicBitrateFloor = config_get_int(main->Config(), "AdvOut",
-				"DynamicBitrateFloor");
+		int dynamicBitrateThreshold = config_get_int(main->Config(),
+				"AdvOut", "DynamicBitrateThreshold");
+		int dynamicBitrateRecoveryTime = config_get_int(main->Config(),
+				"AdvOut", "DynamicBitrateRecoveryTime");
+		int dynamicBitrateDecreaseTime = config_get_int(main->Config(),
+				"AdvOut", "DynamicBitrateDecreaseTime");
+		int dynamicBitrateFloor = config_get_int(main->Config(),
+				"AdvOut", "DynamicBitrateFloor");
 
 		obs_data_t *settings = obs_data_create();
 		obs_data_set_string(settings, "bind_ip", bindIP);
@@ -1699,15 +1729,18 @@ bool AdvancedOutput::StartStreaming(obs_service_t *service)
 		obs_data_set_bool(settings, "low_latency_mode_enabled",
 				enableLowLatencyMode);
 		obs_data_set_bool(settings, "DynamicBitrate", dynamicBitrate);
-		obs_data_set_int(settings, "DynamicBitrateDown", dynamicBitrateDown);
-		obs_data_set_int(settings, "DynamicBitrateUp", dynamicBitrateUp);
+		obs_data_set_int(settings, "DynamicBitrateDown",
+				dynamicBitrateDown);
+		obs_data_set_int(settings, "DynamicBitrateUp",
+				dynamicBitrateUp);
 		obs_data_set_int(settings, "DynamicBitrateThreshold",
 				dynamicBitrateThreshold);
 		obs_data_set_int(settings, "DynamicBitrateRecoveryTime",
 				dynamicBitrateRecoveryTime);
 		obs_data_set_int(settings, "DynamicBitrateDecreaseTime",
 				dynamicBitrateDecreaseTime);
-		obs_data_set_int(settings, "DynamicBitrateFloor", dynamicBitrateFloor);
+		obs_data_set_int(settings, "DynamicBitrateFloor",
+				dynamicBitrateFloor);
 		obs_output_update(streamOutput, settings);
 		obs_data_release(settings);
 

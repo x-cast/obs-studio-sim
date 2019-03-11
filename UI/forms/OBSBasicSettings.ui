@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>981</width>
-    <height>748</height>
+    <height>810</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -2284,7 +2284,7 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="5" column="1">
+                            <item row="4" column="1">
                              <widget class="QSpinBox" name="advOutStreamFFVBitrate">
                               <property name="minimum">
                                <number>0</number>
@@ -2297,7 +2297,7 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="6" column="0">
+                            <item row="5" column="0">
                               <widget class="QLabel" name="label_S6">
                                <property name="text">
                                 <string>Basic.Settings.Output.Adv.FFmpeg.GOPSize</string>
@@ -2307,7 +2307,7 @@
                                </property>
                               </widget>
                             </item>
-                            <item row="6" column="1">
+                            <item row="5" column="1">
                              <widget class="QSpinBox" name="advOutStreamFFVGOPSize">
                               <property name="maximum">
                                <number>1000000000</number>
@@ -2317,7 +2317,7 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="7" column="0">
+                            <item row="6" column="0">
                              <widget class="QCheckBox" name="advOutStreamFFUseRescale">
                               <property name="sizePolicy">
                                <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -2333,7 +2333,7 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="7" column="1">
+                            <item row="6" column="1">
                              <widget class="QComboBox" name="advOutStreamFFRescale">
                               <property name="enabled">
                                <bool>false</bool>
@@ -2343,14 +2343,14 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="8" column="1">
+                            <item row="7" column="1">
                               <widget class="QCheckBox" name="advOutStreamFFIgnoreCompat">
                                <property name="text">
                                 <string>Basic.Settings.Output.Adv.FFmpeg.IgnoreCodecCompat</string>
                                </property>
                               </widget>
                             </item>
-                            <item row="9" column="0">
+                            <item row="8" column="0">
                              <widget class="QLabel" name="label_S7">
                               <property name="text">
                                <string>Basic.Settings.Output.Adv.FFmpeg.VEncoder</string>
@@ -2360,10 +2360,10 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="9" column="1">
+                            <item row="8" column="1">
                              <widget class="QComboBox" name="advOutStreamFFVEncoder"/>
                             </item>
-                            <item row="10" column="0">
+                            <item row="9" column="0">
                              <widget class="QLabel" name="label_S8">
                               <property name="text">
                                <string>Basic.Settings.Output.Adv.FFmpeg.VEncoderSettings</string>
@@ -2373,10 +2373,10 @@
 			      </property>
 			     </widget>
 			    </item>
-                            <item row="10" column="1">
+                            <item row="9" column="1">
                              <widget class="QLineEdit" name="advOutStreamFFVCfg"/>
                             </item>
-                            <item row="11" column="0">
+                            <item row="10" column="0">
                              <widget class="QLabel" name="label_S9">
                               <property name="text">
                                <string>Basic.Settings.Output.AudioBitrate</string>
@@ -2386,7 +2386,7 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="11" column="1">
+                            <item row="10" column="1">
                              <widget class="QSpinBox" name="advOutStreamFFABitrate">
                               <property name="minimum">
                                <number>32</number>
@@ -2402,14 +2402,14 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="12" column="0">
+                            <item row="11" column="0">
                              <widget class="QLabel" name="label_S10">
                               <property name="text">
                                <string>Basic.Settings.Output.Adv.AudioTrack</string>
                               </property>
                              </widget>
                             </item>
-                            <item row="12" column="1">
+                            <item row="11" column="1">
                              <widget class="QWidget" name="widget_S1" native="true">
                               <property name="sizePolicy">
                                <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -2478,7 +2478,7 @@
                               </layout>
                              </widget>
                             </item>
-                            <item row="13" column="0">
+                            <item row="12" column="0">
                              <widget class="QLabel" name="label_S11">
                               <property name="text">
                                <string>Basic.Settings.Output.Adv.FFmpeg.AEncoder</string>
@@ -2488,10 +2488,10 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="13" column="1">
+                            <item row="12" column="1">
                              <widget class="QComboBox" name="advOutStreamFFAEncoder"/>
                             </item>
-                            <item row="14" column="0">
+                            <item row="13" column="0">
                              <widget class="QLabel" name="label_S12">
                               <property name="text">
                                <string>Basic.Settings.Output.Adv.FFmpeg.AEncoderSettings</string>
@@ -2501,12 +2501,184 @@
                               </property>
                              </widget>
                             </item>
-                            <item row="14" column="1">
+                            <item row="13" column="1">
                              <widget class="QLineEdit" name="advOutStreamFFACfg"/>
+                            </item>
+                            <item row="14" column="1">
+                             <widget class="QCheckBox" name="advOutStreamFFDynamic">
+                              <property name="toolTip">
+                               <string>Basic.Settings.Output.Adv.DynamicBitrate.Tooltip</string>
+                              </property>
+                              <property name="text">
+                               <string>Basic.Settings.Output.Adv.DynamicBitrate</string>
+                              </property>
+                             </widget>
+                            </item>
+                            <item row="15" column="1">
+                             <widget class="QWidget" name="widget_StreamFFdyn" native="true">
+                              <property name="minimumSize">
+                               <size>
+                                <width>0</width>
+                                <height>0</height>
+                               </size>
+                              </property>
+                              <layout class="QGridLayout" name="gridLayoutFF">
+                               <item row="0" column="0">
+                                <widget class="QSpinBox" name="advOutStreamFFDynamicDown">
+                                 <property name="toolTip">
+                                  <string>Basic.Settings.Output.Adv.DynamicBitrate.Down.Tooltip</string>
+                                 </property>
+                                 <property name="maximum">
+                                  <number>50</number>
+                                 </property>
+                                 <property name="value">
+                                  <number>15</number>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="0" column="1">
+                                <widget class="QLabel" name="label_S13">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.Dyn.Down</string>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="0" column="2">
+                                <widget class="QSpinBox" name="advOutStreamFFDynamicUp">
+                                 <property name="enabled">
+                                  <bool>true</bool>
+                                 </property>
+                                 <property name="toolTip">
+                                  <string>Basic.Settings.Output.Adv.DynamicBitrate.Up.Tooltip</string>
+                                 </property>
+                                 <property name="layoutDirection">
+                                  <enum>Qt::LeftToRight</enum>
+                                 </property>
+                                 <property name="alignment">
+                                  <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                                 </property>
+                                 <property name="maximum">
+                                  <number>50</number>
+                                 </property>
+                                 <property name="value">
+                                  <number>35</number>
+                                 </property>
+                                 <property name="displayIntegerBase">
+                                  <number>10</number>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="0" column="3">
+                                <widget class="QLabel" name="label_S14">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.Dyn.Up</string>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="1" column="0">
+                                <widget class="QSpinBox" name="advOutStreamFFDynamicDecreaseTime">
+                                 <property name="toolTip">
+                                  <string>Basic.Settings.Output.Adv.DynamicBitrate.DecreaseTime.Tooltip</string>
+                                 </property>
+                                 <property name="maximum">
+                                  <number>1000</number>
+                                 </property>
+                                 <property name="singleStep">
+                                  <number>5</number>
+                                 </property>
+                                 <property name="value">
+                                  <number>100</number>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="1" column="1">
+                                <widget class="QLabel" name="label_S15">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.Dyn.Decrease.Time</string>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="1" column="2">
+                                <widget class="QSpinBox" name="advOutStreamFFDynamicRecoveryTime">
+                                 <property name="toolTip">
+                                  <string>Basic.Settings.Output.Adv.DynamicBitrate.RecoveryTime.Tooltip</string>
+                                 </property>
+                                 <property name="maximum">
+                                  <number>30</number>
+                                 </property>
+                                 <property name="value">
+                                  <number>30</number>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="1" column="3">
+                                <widget class="QLabel" name="label_S16">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.Dyn.Recovery.Time</string>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="2" column="0">
+                                <widget class="QSpinBox" name="advOutStreamFFDynamicThreshold">
+                                 <property name="toolTip">
+                                  <string>Basic.Settings.Output.Adv.DynamicBitrate.Threshold.Tooltip</string>
+                                 </property>
+                                 <property name="maximum">
+                                  <number>25</number>
+                                 </property>
+                                 <property name="minimum">
+                                  <number>1</number>
+                                 </property>
+                                 <property name="value">
+                                  <number>3</number>
+                                 </property>
+                                 <property name="displayIntegerBase">
+                                  <number>10</number>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="2" column="1">
+                                <widget class="QLabel" name="label_S17">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.Dyn.Threshold</string>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="2" column="2">
+                                <widget class="QSpinBox" name="advOutStreamFFDynamicFloor">
+                                 <property name="toolTip">
+                                  <string>Basic.Settings.Output.Adv.DynamicBitrate.Floor.Tooltip</string>
+                                 </property>
+                                 <property name="value">
+                                  <number>50</number>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="2" column="3">
+                                <widget class="QLabel" name="label_S18">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.Dyn.Floor</string>
+                                 </property>
+                                </widget>
+                               </item>
+                              </layout>
+                              <zorder>advOutStreamFFDynamicUp</zorder>
+                              <zorder>label_S13</zorder>
+                              <zorder>label_S14</zorder>
+                              <zorder>advOutStreamFFDynamicDown</zorder>
+                              <zorder>advOutStreamFFDynamicDecreaseTime</zorder>
+                              <zorder>advOutStreamFFDynamicRecoveryTime</zorder>
+                              <zorder>label_S15</zorder>
+                              <zorder>label_S16</zorder>
+                              <zorder>advOutStreamFFDynamicThreshold</zorder>
+                              <zorder>label_S17</zorder>
+                              <zorder>advOutStreamFFDynamicFloor</zorder>
+                              <zorder>label_S18</zorder>
+                             </widget>
                             </item>
                            </layout>
                           </widget>
-			 </widget>			 
+			 </widget>
                         </item>
                        </layout>
                       </widget>
@@ -3032,16 +3204,6 @@
                            </property>
                           </widget>
                          </item>
-                         <item row="7" column="1">
-                          <widget class="QSpinBox" name="advOutFFVGOPSize">
-                           <property name="maximum">
-                            <number>1000000000</number>
-                           </property>
-                           <property name="value">
-                            <number>250</number>
-                           </property>
-                          </widget>
-                         </item>
                          <item row="7" column="0">
                           <widget class="QLabel" name="label_63">
                            <property name="text">
@@ -3049,6 +3211,16 @@
                            </property>
                            <property name="buddy">
                             <cstring>advOutFFVGOPSize</cstring>
+                           </property>
+                          </widget>
+                         </item>
+                         <item row="7" column="1">
+                          <widget class="QSpinBox" name="advOutFFVGOPSize">
+                           <property name="maximum">
+                            <number>1000000000</number>
+                           </property>
+                           <property name="value">
+                            <number>250</number>
                            </property>
                           </widget>
                          </item>
@@ -3098,7 +3270,7 @@
                          <item row="10" column="1">
                           <widget class="QComboBox" name="advOutFFVEncoder"/>
                          </item>
-                         <item row="12" column="0">
+                         <item row="11" column="0">
                           <widget class="QLabel" name="label_38">
                            <property name="text">
                             <string>Basic.Settings.Output.Adv.FFmpeg.VEncoderSettings</string>
@@ -3108,10 +3280,10 @@
                            </property>
                           </widget>
                          </item>
-                         <item row="12" column="1">
+                         <item row="11" column="1">
                           <widget class="QLineEdit" name="advOutFFVCfg"/>
                          </item>
-                         <item row="13" column="0">
+                         <item row="12" column="0">
                           <widget class="QLabel" name="label_41">
                            <property name="text">
                             <string>Basic.Settings.Output.AudioBitrate</string>
@@ -3121,7 +3293,7 @@
                            </property>
                           </widget>
                          </item>
-                         <item row="13" column="1">
+                         <item row="12" column="1">
                           <widget class="QSpinBox" name="advOutFFABitrate">
                            <property name="minimum">
                             <number>32</number>
@@ -3137,14 +3309,14 @@
                            </property>
                           </widget>
                          </item>
-                         <item row="14" column="0">
+                         <item row="13" column="0">
                           <widget class="QLabel" name="label_47">
                            <property name="text">
                             <string>Basic.Settings.Output.Adv.AudioTrack</string>
                            </property>
                           </widget>
                          </item>
-                         <item row="14" column="1">
+                         <item row="13" column="1">
                           <widget class="QWidget" name="widget_10" native="true">
                            <property name="sizePolicy">
                             <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -3213,7 +3385,7 @@
                            </layout>
                           </widget>
                          </item>
-                         <item row="16" column="0">
+                         <item row="14" column="0">
                           <widget class="QLabel" name="label_39">
                            <property name="text">
                             <string>Basic.Settings.Output.Adv.FFmpeg.AEncoder</string>
@@ -3223,10 +3395,10 @@
                            </property>
                           </widget>
                          </item>
-                         <item row="16" column="1">
+                         <item row="14" column="1">
                           <widget class="QComboBox" name="advOutFFAEncoder"/>
                          </item>
-                         <item row="17" column="0">
+                         <item row="15" column="0">
                           <widget class="QLabel" name="label_46">
                            <property name="text">
                             <string>Basic.Settings.Output.Adv.FFmpeg.AEncoderSettings</string>
@@ -3236,7 +3408,7 @@
                            </property>
                           </widget>
                          </item>
-                         <item row="17" column="1">
+                         <item row="15" column="1">
                           <widget class="QLineEdit" name="advOutFFACfg"/>
                          </item>
                         </layout>
@@ -5694,6 +5866,12 @@
   <tabstop>advOutEncoder</tabstop>
   <tabstop>advOutApplyService</tabstop>
   <tabstop>advOutDynamic</tabstop>
+  <tabstop>advOutDynamicDown</tabstop>
+  <tabstop>advOutDynamicUp</tabstop>
+  <tabstop>advOutDynamicDecreaseTime</tabstop>
+  <tabstop>advOutDynamicRecoveryTime</tabstop>
+  <tabstop>advOutDynamicThreshold</tabstop>
+  <tabstop>advOutDynamicFloor</tabstop>
   <tabstop>advOutUseRescale</tabstop>
   <tabstop>advOutRescale</tabstop>
   <tabstop>advOutFFURL</tabstop>
@@ -5715,6 +5893,13 @@
   <tabstop>advOutStreamFFTrack6</tabstop>
   <tabstop>advOutStreamFFAEncoder</tabstop>
   <tabstop>advOutStreamFFACfg</tabstop>
+  <tabstop>advOutStreamFFDynamic</tabstop>
+  <tabstop>advOutStreamFFDynamicDown</tabstop>
+  <tabstop>advOutStreamFFDynamicUp</tabstop>
+  <tabstop>advOutStreamFFDynamicDecreaseTime</tabstop>
+  <tabstop>advOutStreamFFDynamicRecoveryTime</tabstop>
+  <tabstop>advOutStreamFFDynamicThreshold</tabstop>
+  <tabstop>advOutStreamFFDynamicFloor</tabstop>
   <tabstop>advOutRecType</tabstop>
   <tabstop>advOutRecPath</tabstop>
   <tabstop>advOutRecPathBrowse</tabstop>
@@ -5769,7 +5954,7 @@
   <tabstop>sampleRate</tabstop>
   <tabstop>channelSetup</tabstop>
   <tabstop>desktopAudioDevice1</tabstop>
-  <tabstop>desktopAudioDevice2</tabstop>
+  <tabstop>desktopAudioDevice2</tabstop> 
   <tabstop>auxAudioDevice1</tabstop>
   <tabstop>auxAudioDevice2</tabstop>
   <tabstop>auxAudioDevice3</tabstop>
@@ -6493,6 +6678,214 @@
    <sender>advOutDynamic</sender>
    <signal>toggled(bool)</signal>
    <receiver>label_71</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>762</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>978</x>
+     <y>306</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>advOutStreamFFDynamicUp</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>674</x>
+     <y>236</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>advOutStreamFFDynamicDown</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>424</x>
+     <y>236</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_S13</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>225</x>
+     <y>123</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_S14</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>814</x>
+     <y>236</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>advOutStreamFFDynamicThreshold</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>435</x>
+     <y>277</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>advOutStreamFFDynamicRecoveryTime</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>721</x>
+     <y>277</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_S15</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>578</x>
+     <y>277</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_S16</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>862</x>
+     <y>277</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>advOutStreamFFDynamicDecreaseTime</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>442</x>
+     <y>277</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_S17</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>663</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>607</x>
+     <y>277</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>widget_StreamFFdyn</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>213</x>
+     <y>88</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>213</x>
+     <y>88</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>advOutStreamFFDynamicFloor</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>762</x>
+     <y>209</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>804</x>
+     <y>306</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>advOutStreamFFDynamic</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_S18</receiver>
    <slot>setVisible(bool)</slot>
    <hints>
     <hint type="sourcelabel">

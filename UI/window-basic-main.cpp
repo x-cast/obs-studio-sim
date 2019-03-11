@@ -1246,7 +1246,7 @@ bool OBSBasic::InitBasicConfigDefaults()
 	config_set_default_uint  (basicConfig, "AdvOut", "TrackIndex", 1);
 	config_set_default_string(basicConfig, "AdvOut", "Encoder", "obs_x264");
 
-	config_set_default_string(basicConfig, "AdvOut", "StreamFFFormat", "flv");
+	config_set_default_string(basicConfig, "AdvOut", "StreamFFExtension", "flv");
 	config_set_default_uint(basicConfig, "AdvOut", "StreamFFVBitrate", 2500);
 	config_set_default_uint(basicConfig, "AdvOut", "StreamFFVGOPSize", 250);
 	config_set_default_bool(basicConfig, "AdvOut", "StreamFFUseRescale",
@@ -1255,7 +1255,20 @@ bool OBSBasic::InitBasicConfigDefaults()
 			true);
 	config_set_default_uint(basicConfig, "AdvOut", "StreamFFABitrate", 160);
 	config_set_default_uint(basicConfig, "AdvOut", "StreamFFAudioMixes", 1);
-
+	config_set_default_bool(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrate", false);
+	config_set_default_int(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrateDown", 15);
+	config_set_default_int(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrateUp", 35);
+	config_set_default_int(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrateThreshold", 3);
+	config_set_default_int(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrateRecoveryTime", 30);
+	config_set_default_int(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrateDecreaseTime", 100);
+	config_set_default_int(basicConfig, "AdvOut",
+			"StreamFFDynamicBitrateFloor", 50);
 	config_set_default_string(basicConfig, "AdvOut", "RecType", "Standard");
 
 	config_set_default_string(basicConfig, "AdvOut", "RecFilePath",

@@ -31,6 +31,17 @@
 #include "closest-pixel-format.h"
 #include "obs-ffmpeg-compat.h"
 
+#define CONGESTION_ARRAY_SIZE 300 // about 10 sec of congestion memory
+#define OPT_DYN_BITRATE "DynamicBitrate"
+#define CONGESTION_THRESHOLD 700000 // in microsec, 700 ms = 100% congestion
+
+enum dynamicBitrateState {
+	BITRATE_EQUAL_INITIAL_BITRATE,
+	BITRATE_SWITCHING_DOWN, // decreasing bitrate due to congestion
+	BITRATE_SWITCHING_STATIONARY, // bitrate unchanged; bitrate < initial bitrate
+	BITRATE_SWITCHING_UP // increasing bitrate due to congestion clearing
+};
+
 struct ffmpeg_cfg {
 	const char         *url;
 	const char         *format_name;
@@ -110,6 +121,27 @@ struct ffmpeg_output {
 	os_event_t         *stop_event;
 
 	DARRAY(AVPacket)   packets;
+	/* dynamic bitrate variables */
+	float            congestion;
+	int64_t          last_dts_usec;
+	int64_t          first_dts_usec;
+	int              dynamic_bitrate;
+	int              initial_bitrate;
+	bool             switch_variable_bitrate;
+	uint64_t         last_adjustment_time;
+	float            last_congestion;
+	float            mean_congestion;
+	float            congestion_array[CONGESTION_ARRAY_SIZE];
+	size_t           congestion_counter;
+	bool             increase_just_attempted;
+	int              bitrate_decrease_rate; // % at which bitrate will decrease every decrease_polling_time
+	int              bitrate_increase_rate; // % at which bitrate will increase every recovery_polling_time
+	uint64_t         recovery_polling_time; // time in seconds after which a bitrate increase is attempted if congestion is clearing.
+	uint64_t         decrease_polling_time; // time in milliseconds between two congestion tests;
+	                                               // Bitrate decreases if congestion is found (100 ms by default).
+	int              dynamic_threshold; // congestion threshold in % above which bitrate is decreased (3% by default).
+	int              bitrate_floor; // minimum bitrate in % of initial one
+	enum dynamicBitrateState bitrate_state; // stores the dynamic bitrate state for UI status bar
 };
 
 /* ------------------------------------------------------------------------- */
@@ -251,6 +283,8 @@ static bool create_video_stream(struct ffmpeg_data *data)
 
 	context                 = data->video->codec;
 	context->bit_rate       = data->config.video_bitrate * 1000;
+	context->rc_max_rate    = data->config.video_bitrate * 1000;
+	context->rc_buffer_size = data->config.video_bitrate * 500;
 	context->width          = data->config.scale_width;
 	context->height         = data->config.scale_height;
 	context->time_base      = (AVRational){ ovi.fps_den, ovi.fps_num };
@@ -634,6 +668,7 @@ static void *ffmpeg_output_create(obs_data_t *settings, obs_output_t *output)
 	struct ffmpeg_output *data = bzalloc(sizeof(struct ffmpeg_output));
 	pthread_mutex_init_value(&data->write_mutex);
 	data->output = output;
+	data->congestion = 0;
 
 	if (pthread_mutex_init(&data->write_mutex, NULL) != 0)
 		goto fail;
@@ -698,6 +733,186 @@ static inline void copy_data(AVFrame *pic, const struct video_data *frame,
 			       bytes);
 		}
 	}
+}
+
+/* dynamic variable bitrate */
+static void ffmpeg_encoder_update(void *data, obs_data_t *settings)
+{
+	struct ffmpeg_output *output = data;
+	struct ffmpeg_data *ff_data = &output->ff_data;
+	AVCodecContext * context;
+	if (ff_data->video) {
+		if (ff_data->video->codec) {
+			context = ff_data->video->codec;
+			uint64_t bitrate = obs_data_get_int(settings, "video_bitrate");
+			context->bit_rate = bitrate * 1000;
+			context->rc_max_rate = bitrate * 1000;
+			context->rc_buffer_size = bitrate * 1000 / 2;
+		}
+	}
+}
+
+float find_maximum(float a[], int n)
+{
+	int c;
+	int max;
+	max = a[0];
+	for (c = 1; c < n; c++) {
+		if (a[c] > max)
+			max = a[c];
+	}
+	return max;
+}
+
+static void adjust_bitrate(struct ffmpeg_output *stream)
+{
+	struct ffmpeg_data *data = &stream->ff_data;
+	obs_data_t *settings = obs_output_get_settings(stream->output);
+	const char *encoder_id = obs_data_get_string(settings, "video_encoder");
+	// later add a check on nal_hrd setting for libx264
+		
+	uint64_t cur_time_ms = os_gettime_ns() / 1000000;
+	uint64_t last_adjustment_time = stream->last_adjustment_time;
+	
+	size_t counter = stream->congestion_counter;
+	stream->mean_congestion += (stream->congestion
+			-stream->congestion_array[counter]) / CONGESTION_ARRAY_SIZE;
+	stream->congestion_array[counter] = stream->congestion;
+	stream->congestion_counter = (stream->congestion_counter + 1) %
+			CONGESTION_ARRAY_SIZE;
+	float congestion = stream->congestion;
+	float last_congestion = stream->last_congestion;
+	float mean_congestion = stream->mean_congestion;
+	float max_congestion = find_maximum(stream->congestion_array,
+			CONGESTION_ARRAY_SIZE);
+	int current_bitrate = stream->dynamic_bitrate;
+	int initial_bitrate = stream->initial_bitrate;
+	int previous_bitrate;
+	
+	float decrease_rate = (float)stream->bitrate_decrease_rate;
+	float increase_rate = (float)stream->bitrate_increase_rate;
+	float dynamic_threshold = 0.01 * (float)stream->dynamic_threshold;
+	int min_bitrate = (int)(initial_bitrate * stream->bitrate_floor / 100);
+	uint64_t polling_time = 1000 * stream->recovery_polling_time; // in millisecs
+	uint64_t decrease_polling_time = stream->decrease_polling_time; // set in millisec in UI
+	
+	 /* On default settings, bitrate is adjusted downwards every 100 ms by
+	 * about 15%.
+        * Detection threshold of congestion is 3% on default but could be larger;
+        * this would mean less reactivity but would allow micro-congestions
+        * to heal themselves without changing too soon the bitrate.
+        * The minimal bitrate is half the initial one on default.
+        * The polling time tells how many milliseconds one waits before trying
+        * to increase the bitrate. It is set at 30 sec (mostly a Twitch demand).
+        * The larger the polling time, the lower you want the threshold to be
+        * in order to counter-balance the potential of many drops.
+        * You also want the increase rate to be set at larger values.
+        * Ex: if polling_time is changed : 30 sec -> 5 sec , then change :
+        * increase_rate : 35 % -> 10 %
+        * threshold: 5 % congestion -> 15 %
+        * decrease_polling_time: 300 millisec -> 1000 millisec
+        */
+	bool decrease_br = congestion > dynamic_threshold &&
+			current_bitrate > min_bitrate &&
+			(cur_time_ms - last_adjustment_time) > decrease_polling_time;
+
+	bool increase_br = mean_congestion < 0.05 && max_congestion < 0.15 &&
+			congestion < 0.05 && last_congestion < 0.05 &&
+			current_bitrate < initial_bitrate &&
+			(cur_time_ms - last_adjustment_time) > polling_time;
+
+	bool revert_increase_br = congestion > 0.01 && stream->increase_just_attempted;
+	if ((cur_time_ms - last_adjustment_time) > decrease_polling_time)
+		stream->increase_just_attempted = false;
+	
+	if (stream->switch_variable_bitrate) {
+	/* Bitrate is adjusted downwards by 15% every 100 ms (on default
+	 * settings).
+	 */
+		if (decrease_br) {
+			current_bitrate = (int)(current_bitrate / (1.0 + decrease_rate / 100.0));
+
+		if (current_bitrate < min_bitrate)
+			current_bitrate = min_bitrate;
+
+		stream->dynamic_bitrate = current_bitrate;
+		previous_bitrate = obs_data_get_int(settings, "video_bitrate");
+		obs_data_set_int(settings, "video_bitrate", current_bitrate);
+		ffmpeg_encoder_update(stream, settings);
+		blog(LOG_INFO, "Congestion detected %f percent, "
+				"dropping bitrate for encoder %s "
+				"from %i kbps  to %i kbps", congestion * 100, encoder_id,
+				previous_bitrate, current_bitrate);
+		stream->last_adjustment_time = cur_time_ms;
+		stream->bitrate_state = BITRATE_SWITCHING_DOWN;
+		}
+	/* Bitrate is adjusted upwards by 35% every 30 sec on default. */
+		if (increase_br) {
+			current_bitrate = (int)((float)current_bitrate * (1.0 + increase_rate / 100.0));
+			
+			if (current_bitrate > initial_bitrate)
+				current_bitrate = initial_bitrate;
+
+			stream->dynamic_bitrate = current_bitrate;
+			stream->increase_just_attempted = true;
+			previous_bitrate = obs_data_get_int(settings, "video_bitrate");
+			obs_data_set_int(settings, "video_bitrate", current_bitrate);
+			ffmpeg_encoder_update(stream, settings);
+			blog(LOG_INFO, "Congestion clearing at %f percent, "
+					"raising bitrate for encoder %s "
+					"to %i kbps from previous bitrate %i kbps \n",
+					congestion * 100, encoder_id, current_bitrate,
+					previous_bitrate);
+			stream->last_adjustment_time = cur_time_ms;
+			stream->bitrate_state = current_bitrate == initial_bitrate ?
+					BITRATE_EQUAL_INITIAL_BITRATE :
+					BITRATE_SWITCHING_UP;
+		}
+	/* revert bitrate increase if the slightest congestion (1%) is detected */
+		if (revert_increase_br) {
+			previous_bitrate = current_bitrate;
+			current_bitrate = (int)((float)current_bitrate / (1.0 + increase_rate / 100.0));
+			stream->dynamic_bitrate = current_bitrate;
+			obs_data_set_int(settings, "video_bitrate", current_bitrate);
+			ffmpeg_encoder_update(stream, settings);
+			blog(LOG_INFO, "Reverting bitrate increase for encoder %s, "
+					"due to closeness to current maximum bandwidth,"
+					"to %i kbps from previous bitrate %i kbps \n",
+					encoder_id, current_bitrate, previous_bitrate);
+			stream->last_adjustment_time = cur_time_ms;
+			stream->bitrate_state = BITRATE_SWITCHING_DOWN;
+			stream->increase_just_attempted = false;
+		}
+	/* after 1 sec the bitrate state is reset to BITRATE_SWITCHING_STATIONARY */
+		if (!decrease_br && !increase_br &&
+			(cur_time_ms - last_adjustment_time) > 1000) {
+			stream->bitrate_state = current_bitrate == initial_bitrate ?
+					BITRATE_EQUAL_INITIAL_BITRATE :
+					BITRATE_SWITCHING_STATIONARY;
+		}
+		stream->last_congestion = congestion;
+	}
+	obs_data_release(settings);
+}
+
+static uint64_t get_packet_sys_dts(struct ffmpeg_output *output,
+		AVPacket * packet)
+{
+	struct ffmpeg_data *data = &output->ff_data;
+	uint64_t start_ts;
+	
+	AVRational time_base;
+	
+	if (data->video && data->video->index == packet->stream_index) {
+		time_base = data->video->time_base;
+		start_ts = output->video_start_ts;
+		
+	} else {
+		time_base = data->audio_streams[0]->time_base;
+		start_ts = output->audio_start_ts;	
+	}
+		return start_ts + (uint64_t)av_rescale_q(packet->dts,
+			time_base, (AVRational) { 1, 1000000000 });
 }
 
 static void receive_video(void *param, struct video_data *frame)
@@ -780,6 +995,21 @@ static void receive_video(void *param, struct video_data *frame)
 #if LIBAVFORMAT_VERSION_MAJOR < 58
 	}
 #endif
+	/* update congestion */
+	float buffer_threshold = CONGESTION_THRESHOLD;
+	int num = output->packets.num;
+	if (output->packets.num != 0) {
+		output->first_dts_usec = get_packet_sys_dts(output, &output->packets.array[0]) / 1000;
+		output->last_dts_usec = get_packet_sys_dts(output, &packet) / 1000;
+	}
+	if (output->packets.num >= 5)
+		output->congestion = (float)(output->last_dts_usec - output->first_dts_usec) / buffer_threshold;
+	else
+		output->congestion = 0;
+	//if (output->congestion >= 0.05)
+	//      blog(LOG_INFO, "congestion is: %f", output->congestion);
+	adjust_bitrate(output);
+
 	if (ret != 0) {
 		blog(LOG_WARNING, "receive_video: Error writing video: %s",
 				av_err2str(ret));
@@ -932,26 +1162,6 @@ static void receive_audio(void *param, size_t mix_idx, struct audio_data *frame)
 
 		encode_audio(output, track_order, context, data->audio_size);
 	}
-}
-
-static uint64_t get_packet_sys_dts(struct ffmpeg_output *output,
-		AVPacket *packet)
-{
-	struct ffmpeg_data *data = &output->ff_data;
-	uint64_t start_ts;
-
-	AVRational time_base;
-
-	if (data->video && data->video->index == packet->stream_index) {
-		time_base = data->video->time_base;
-		start_ts = output->video_start_ts;
-	} else {
-		time_base = data->audio_streams[0]->time_base;
-		start_ts = output->audio_start_ts;
-	}
-
-	return start_ts + (uint64_t)av_rescale_q(packet->dts,
-			time_base, (AVRational){1, 1000000000});
 }
 
 static int process_packet(struct ffmpeg_output *output)
@@ -1160,6 +1370,44 @@ static bool ffmpeg_output_start(void *data)
 	output->video_start_ts = 0;
 	output->total_bytes = 0;
 
+	/* store initial bitrate for dynamical variable bitrate option */
+	obs_data_t *settings = obs_output_get_settings(output->output);
+	
+	int bitrate = obs_data_get_int(settings, "video_bitrate");
+	output->initial_bitrate = bitrate;
+	output->dynamic_bitrate = bitrate;
+	bool dyn = obs_data_get_bool(settings, OPT_DYN_BITRATE);
+	output->switch_variable_bitrate = dyn;
+	if (output->switch_variable_bitrate)
+		blog(LOG_INFO, "Dynamic bitrate ON: bitrate auto management"
+				" when network congestion is detected.\n");
+	else
+		blog(LOG_INFO, "Dynamic bitrate OFF");
+
+	output->bitrate_decrease_rate = obs_data_get_int(settings,
+			"DynamicBitrateDown");
+	output->bitrate_increase_rate = obs_data_get_int(settings,
+			"DynamicBitrateUp");
+	output->dynamic_threshold = obs_data_get_int(settings,
+			"DynamicBitrateThreshold");
+	output->recovery_polling_time = (uint64_t)obs_data_get_int(settings,
+			"DynamicBitrateRecoveryTime");
+	output->decrease_polling_time = (uint64_t)obs_data_get_int(settings,
+			"DynamicBitrateDecreaseTime");
+	output->bitrate_floor = obs_data_get_int(settings,
+			"DynamicBitrateFloor");
+	output->last_adjustment_time = os_gettime_ns() / 1000000;
+	output->last_congestion = 0;
+	output->congestion_counter = 0;
+	output->mean_congestion = 0;
+	output->increase_just_attempted = false;
+	output->bitrate_state = BITRATE_EQUAL_INITIAL_BITRATE;
+	size_t count;
+	for (count = 0; count < CONGESTION_ARRAY_SIZE; count++) {
+		output->congestion_array[count] = 0;
+	}
+	obs_data_release(settings);
+
 	ret = pthread_create(&output->start_thread, NULL, start_thread, output);
 	return (output->connecting = (ret == 0));
 }
@@ -1186,6 +1434,10 @@ static void ffmpeg_output_stop(void *data, uint64_t ts)
 			output->stop_ts = ts;
 		}
 	}
+	/* reset to initial bitrate */
+	obs_data_t *settings = obs_output_get_settings(output->output);
+	obs_data_set_int(settings, "video_bitrate", output->initial_bitrate);
+	obs_data_release(settings);
 }
 
 static void ffmpeg_deactivate(struct ffmpeg_output *output)
@@ -1197,6 +1449,7 @@ static void ffmpeg_deactivate(struct ffmpeg_output *output)
 		output->write_thread_active = false;
 	}
 
+	output->congestion = 0;
 	pthread_mutex_lock(&output->write_mutex);
 
 	for (size_t i = 0; i < output->packets.num; i++)
@@ -1214,6 +1467,12 @@ static uint64_t ffmpeg_output_total_bytes(void *data)
 	return output->total_bytes;
 }
 
+static int ffmpeg_dynamic_bitrate_state(void *data)
+{
+	struct ffmpeg_output *stream = data;
+	return stream->bitrate_state;
+}
+
 struct obs_output_info ffmpeg_output = {
 	.id        = "ffmpeg_output",
 	.flags     = OBS_OUTPUT_AUDIO |
@@ -1225,6 +1484,8 @@ struct obs_output_info ffmpeg_output = {
 	.start     = ffmpeg_output_start,
 	.stop      = ffmpeg_output_stop,
 	.raw_video = receive_video,
-	.raw_audio2 = receive_audio,
-	.get_total_bytes = ffmpeg_output_total_bytes,
+	.raw_audio2        = receive_audio,
+	.get_total_bytes   = ffmpeg_output_total_bytes,
+	.update            = ffmpeg_encoder_update,
+	.get_bitrate_state = ffmpeg_dynamic_bitrate_state,
 };

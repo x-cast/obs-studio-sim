@@ -393,6 +393,13 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->advOutStreamFFTrack6,       CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutStreamFFAEncoder,     COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutStreamFFACfg,         EDIT_CHANGED,   OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamic,      TOGGLE_CHANGED,  OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamicDown,  SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamicUp,    SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamicThreshold, SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamicRecoveryTime,  SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamicDecreaseTime,  SCROLL_CHANGED, OUTPUTS_CHANGED);
+	HookWidget(ui->advOutStreamFFDynamicFloor, SCROLL_CHANGED, OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecType,        COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecPath,        EDIT_CHANGED,   OUTPUTS_CHANGED);
 	HookWidget(ui->advOutNoSpace,        CHECK_CHANGED,  OUTPUTS_CHANGED);
@@ -603,8 +610,8 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	LoadEncoderTypes();
 	LoadColorRanges();
-	LoadFormats(ui->advOutStreamFFFormat);
 	LoadFormats(ui->advOutFFFormat);
+	LoadFormats(ui->advOutStreamFFFormat);
 
 	auto ReloadAudioSources = [](void *data, calldata_t *param)
 	{
@@ -877,7 +884,8 @@ void OBSBasicSettings::LoadFormats(QComboBox *formatFF)
 {
 	formatFF->blockSignals(true);
 
-	formats.reset(ff_format_supported());
+	if (formatFF == ui->advOutFFFormat)
+		formats.reset(ff_format_supported());
 	const ff_format_desc *format = formats.get();
 
 	while(format != nullptr) {
@@ -1827,6 +1835,20 @@ void OBSBasicSettings::LoadAdvOutputFFmpegStreamingSettings()
 			"StreamFFAEncoderId");
 	const char *aEncCustom = config_get_string(main->Config(), "AdvOut",
 			"StreamFFACustom");
+	bool dynamicBitrate = config_get_bool(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrate");
+	int dynamicBitrateDown = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateDown");
+	int dynamicBitrateUp = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateUp");
+	int dynamicBitrateThreshold = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateThreshold");
+	int dynamicBitrateRecoveryTime = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateRecoveryTime");
+	int dynamicBitrateDecreaseTime = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateDecreaseTime");
+	int dynamicBitrateFloor = config_get_int(main->Config(), "AdvOut",
+			"StreamFFDynamicBitrateFloor");
 
 	ui->advOutFFURL->setText(QT_UTF8(url));
 	SelectFormat(ui->advOutStreamFFFormat, format, mimeType);
@@ -1849,6 +1871,15 @@ void OBSBasicSettings::LoadAdvOutputFFmpegStreamingSettings()
 	ui->advOutStreamFFTrack4->setChecked(audioMixes & (1 << 3));
 	ui->advOutStreamFFTrack5->setChecked(audioMixes & (1 << 4));
 	ui->advOutStreamFFTrack6->setChecked(audioMixes & (1 << 5));
+
+	ui->advOutStreamFFDynamic->setChecked(dynamicBitrate);
+	ui->widget_StreamFFdyn->setVisible(dynamicBitrate);
+	ui->advOutStreamFFDynamicDown->setValue(dynamicBitrateDown);
+	ui->advOutStreamFFDynamicUp->setValue(dynamicBitrateUp);
+	ui->advOutStreamFFDynamicThreshold->setValue(dynamicBitrateThreshold);
+	ui->advOutStreamFFDynamicRecoveryTime->setValue(dynamicBitrateRecoveryTime);
+	ui->advOutStreamFFDynamicDecreaseTime->setValue(dynamicBitrateDecreaseTime);
+	ui->advOutStreamFFDynamicFloor->setValue(dynamicBitrateFloor);
 }
 
 void OBSBasicSettings::LoadAdvOutputFFmpegRecordingSettings()
@@ -3155,8 +3186,7 @@ void OBSBasicSettings::SaveFormat(QComboBox *combo)
 					desc.name);
 			config_set_string(main->Config(), "AdvOut", "FFFormatMimeType",
 					desc.mimeType);
-		}
-		else {
+		} else {
 			config_set_string(main->Config(), "AdvOut", "StreamFFFormat",
 					desc.name);
 			config_set_string(main->Config(), "AdvOut", "StreamFFFormatMimeType",
@@ -3285,6 +3315,20 @@ void OBSBasicSettings::SaveOutputSettings()
 		(ui->advOutStreamFFTrack4->isChecked() ? (1 << 3) : 0) |
 		(ui->advOutStreamFFTrack5->isChecked() ? (1 << 4) : 0) |
 		(ui->advOutStreamFFTrack6->isChecked() ? (1 << 5) : 0));
+	SaveCheckBox(ui->advOutStreamFFDynamic, "AdvOut",
+			"StreamFFDynamicBitrate");
+	SaveSpinBox(ui->advOutStreamFFDynamicDown, "AdvOut",
+			"StreamFFDynamicBitrateDown");
+	SaveSpinBox(ui->advOutStreamFFDynamicUp, "AdvOut",
+			"StreamFFDynamicBitrateUp");
+	SaveSpinBox(ui->advOutStreamFFDynamicThreshold, "AdvOut",
+			"StreamFFDynamicBitrateThreshold");
+	SaveSpinBox(ui->advOutStreamFFDynamicRecoveryTime, "AdvOut",
+			"StreamFFDynamicBitrateRecoveryTime");
+	SaveSpinBox(ui->advOutStreamFFDynamicDecreaseTime, "AdvOut",
+			"StreamFFDynamicBitrateDecreaseTime");
+	SaveSpinBox(ui->advOutStreamFFDynamicFloor, "AdvOut",
+			"StreamFFDynamicBitrateFloor");
 
 	config_set_string(main->Config(), "AdvOut", "RecType",
 			RecTypeFromIdx(ui->advOutRecType->currentIndex()));
@@ -3819,7 +3863,7 @@ void OBSBasicSettings::on_advOutFFVEncoder_currentIndexChanged(int idx)
 
 void OBSBasicSettings::on_advOutStreamFFFormat_currentIndexChanged(int idx)
 {
-	const QVariant itemDataVariant = ui->advOutFFFormat->itemData(idx);
+	const QVariant itemDataVariant = ui->advOutStreamFFFormat->itemData(idx);
 
 	if (!itemDataVariant.isNull()) {
 		FormatDesc desc = itemDataVariant.value<FormatDesc>();
