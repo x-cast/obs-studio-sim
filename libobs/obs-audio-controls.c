@@ -538,8 +538,7 @@ void volmeter_data_received(void *vptr, const struct audio_data *data,
 
 	// Adjust magnitude/peak based on the volume level set by the user.
 	// And convert to dB.
-	mul = muted && !obs_source_muted(source) ? 0.0f
-						 : db_to_mul(volmeter->cur_db);
+	mul = muted ? 0.0f : db_to_mul(volmeter->cur_db);
 	for (int channel_nr = 0; channel_nr < MAX_AUDIO_CHANNELS;
 	     channel_nr++) {
 		magnitude[channel_nr] =
@@ -560,6 +559,7 @@ static void volmeter_source_data_received(void *vptr, obs_source_t *source,
 					  const struct audio_data *data,
 					  bool muted)
 {
+	muted = muted && !obs_source_muted(source);
 	volmeter_data_received(vptr, data, muted);
 	UNUSED_PARAMETER(source);
 }
