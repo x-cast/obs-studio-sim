@@ -40,7 +40,6 @@ private:
 	QPointer<QLabel> labelL;
 	QPointer<QLabel> labelR;
 	QPointer<QSpinBox> syncOffset;
-	QPointer<QComboBox> monitoringType;
 	QPointer<QCheckBox> mixer1;
 	QPointer<QCheckBox> mixer2;
 	QPointer<QCheckBox> mixer3;
@@ -82,7 +81,6 @@ public slots:
 	void SourceFlagsChanged(uint32_t flags);
 	void SourceVolumeChanged(float volume);
 	void SourceSyncChanged(int64_t offset);
-	void SourceMonitoringTypeChanged(int type);
 	void SourceMixersChanged(uint32_t mixers);
 	void SourceBalanceChanged(int balance);
 
@@ -91,7 +89,6 @@ public slots:
 	void downmixMonoChanged(bool checked);
 	void balanceChanged(int val);
 	void syncOffsetChanged(int milliseconds);
-	void monitoringTypeChanged(int index);
 	void mixer1Changed(bool checked);
 	void mixer2Changed(bool checked);
 	void mixer3Changed(bool checked);
