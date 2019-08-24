@@ -33,6 +33,7 @@ if(OS_WINDOWS)
   add_subdirectory(obs-text)
   add_subdirectory(vlc-video)
   add_subdirectory(win-asio)
+  add_subdirectory(obs-vst3)
 
   if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/enc-amf/CMakeLists.txt")
     add_subdirectory(enc-amf)
