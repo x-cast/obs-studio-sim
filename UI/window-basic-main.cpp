@@ -2103,24 +2103,11 @@ void OBSBasic::OBSInit()
 	delete ui->actionShowCrashLogs;
 	delete ui->actionUploadLastCrashLog;
 	delete ui->menuCrashLogs;
+	//delete ui->actionCheckForUpdates;
 	ui->actionShowCrashLogs = nullptr;
 	ui->actionUploadLastCrashLog = nullptr;
 	ui->menuCrashLogs = nullptr;
-#if !defined(__APPLE__)
-	delete ui->actionCheckForUpdates;
-	ui->actionCheckForUpdates = nullptr;
-#endif
-#endif
-
-#ifdef __APPLE__
-	/* Remove OBS' Fullscreen Interface menu in favor of the one macOS adds by default */
-	delete ui->actionFullscreenInterface;
-	ui->actionFullscreenInterface = nullptr;
-#endif
-
-#if defined(_WIN32) || defined(__APPLE__)
-	if (App()->IsUpdaterDisabled())
-		ui->actionCheckForUpdates->setEnabled(false);
+	//ui->actionCheckForUpdates = nullptr;
 #endif
 
 	OnFirstLoad();
@@ -4050,58 +4037,14 @@ void init_sparkle_updater(bool update_to_undeployed);
 void trigger_sparkle_update();
 #endif
 
-void OBSBasic::TimedCheckForUpdates()
-{
-	if (App()->IsUpdaterDisabled())
-		return;
-	if (!config_get_bool(App()->GlobalConfig(), "General",
-			     "EnableAutoUpdates"))
-		return;
-
-#if defined(ENABLE_SPARKLE_UPDATER)
-	init_sparkle_updater(config_get_bool(App()->GlobalConfig(), "General",
-					     "UpdateToUndeployed"));
-#elif _WIN32
-	long long lastUpdate = config_get_int(App()->GlobalConfig(), "General",
-					      "LastUpdateCheck");
-	uint32_t lastVersion =
-		config_get_int(App()->GlobalConfig(), "General", "LastVersion");
-
-	if (lastVersion < LIBOBS_API_VER) {
-		lastUpdate = 0;
-		config_set_int(App()->GlobalConfig(), "General",
-			       "LastUpdateCheck", 0);
-	}
-
-	long long t = (long long)time(nullptr);
-	long long secs = t - lastUpdate;
-
-	if (secs > UPDATE_CHECK_INTERVAL)
-		CheckForUpdates(false);
-#endif
-}
+void OBSBasic::TimedCheckForUpdates() {}
 
 void OBSBasic::CheckForUpdates(bool manualUpdate)
 {
-#if defined(ENABLE_SPARKLE_UPDATER)
-	trigger_sparkle_update();
-#elif _WIN32
-	ui->actionCheckForUpdates->setEnabled(false);
-
-	if (updateCheckThread && updateCheckThread->isRunning())
-		return;
-
-	updateCheckThread.reset(new AutoUpdateThread(manualUpdate));
-	updateCheckThread->start();
-#endif
-
 	UNUSED_PARAMETER(manualUpdate);
 }
 
-void OBSBasic::updateCheckFinished()
-{
-	ui->actionCheckForUpdates->setEnabled(true);
-}
+void OBSBasic::updateCheckFinished() {}
 
 void OBSBasic::DuplicateSelectedScene()
 {
@@ -6558,7 +6501,7 @@ void OBSBasic::on_actionUploadLastCrashLog_triggered()
 
 void OBSBasic::on_actionCheckForUpdates_triggered()
 {
-	CheckForUpdates(true);
+	//	CheckForUpdates(true);
 }
 
 void OBSBasic::logUploadFinished(const QString &text, const QString &error)

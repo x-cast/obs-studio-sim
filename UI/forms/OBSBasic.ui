@@ -523,7 +523,6 @@
     <addaction name="menuLogFiles"/>
     <addaction name="menuCrashLogs"/>
     <addaction name="separator"/>
-    <addaction name="actionCheckForUpdates"/>
     <addaction name="actionShowAbout"/>
     <addaction name="separator"/>
    </widget>
@@ -1939,11 +1938,6 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+End</string>
-   </property>
-  </action>
-  <action name="actionCheckForUpdates">
-   <property name="text">
-    <string>Basic.MainMenu.Help.CheckForUpdates</string>
    </property>
   </action>
   <action name="actionInteract">

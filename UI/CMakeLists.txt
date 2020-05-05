@@ -22,6 +22,8 @@ if(TARGET obs-browser
   add_library(obs-browser-panels INTERFACE)
   add_library(OBS::browser-panels ALIAS obs-browser-panels)
 
+set(DISABLE_UPDATE_MODULE TRUE CACHE BOOL "Disables building the update module")
+
   target_include_directories(
     obs-browser-panels INTERFACE ${CMAKE_SOURCE_DIR}/plugins/obs-browser/panel)
 endif()
