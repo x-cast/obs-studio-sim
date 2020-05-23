@@ -2352,9 +2352,9 @@ void OBSBasic::InitHotkeys()
 	t.escape = Str("Hotkeys.Escape");
 	obs_hotkeys_set_translations(&t);
 
-	obs_hotkeys_set_audio_hotkeys_translations(Str("Mute"), Str("Unmute"),
-						   Str("Push-to-mute"),
-						   Str("Push-to-talk"));
+	obs_hotkeys_set_audio_hotkeys_translations(
+		Str("Mute"), Str("Unmute"), Str("Monitor"), Str("Unmonitor"),
+		Str("Push-to-mute"), Str("Push-to-talk"));
 
 	obs_hotkeys_set_sceneitem_hotkeys_translations(Str("SceneItemShow"),
 						       Str("SceneItemHide"));

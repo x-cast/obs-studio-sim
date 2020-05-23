@@ -432,6 +432,8 @@ struct obs_core_hotkeys {
 	char *push_to_talk;
 	char *sceneitem_show;
 	char *sceneitem_hide;
+	char *monitor;
+	char *unmonitor;
 };
 
 struct obs_core {
@@ -619,6 +621,7 @@ enum audio_action_type {
 	AUDIO_ACTION_MUTE,
 	AUDIO_ACTION_PTT,
 	AUDIO_ACTION_PTM,
+	AUDIO_ACTION_MON,
 };
 
 struct audio_action {
@@ -786,6 +789,7 @@ struct obs_source {
 
 	/* sources specific hotkeys */
 	obs_hotkey_pair_id mute_unmute_key;
+	obs_hotkey_pair_id monitor_unmonitor_key;
 	obs_hotkey_id push_to_mute_key;
 	obs_hotkey_id push_to_talk_key;
 	bool push_to_mute_enabled;
@@ -831,6 +835,7 @@ struct obs_source {
 	enum obs_monitoring_type monitoring_type;
 
 	obs_data_t *private_settings;
+	bool monitoring;
 };
 
 extern struct obs_source_info *get_source_info(const char *id);

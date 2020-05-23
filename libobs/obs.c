@@ -987,6 +987,8 @@ static inline bool obs_init_hotkeys(void)
 	hotkeys->name_map_init_token = obs_pthread_once_init_token;
 	hotkeys->mute = bstrdup("Mute");
 	hotkeys->unmute = bstrdup("Unmute");
+	hotkeys->monitor = bstrdup("Monitor");
+	hotkeys->unmonitor = bstrdup("Unmonitor");
 	hotkeys->push_to_mute = bstrdup("Push-to-mute");
 	hotkeys->push_to_talk = bstrdup("Push-to-talk");
 	hotkeys->sceneitem_show = bstrdup("Show '%1'");
@@ -1033,6 +1035,8 @@ static inline void obs_free_hotkeys(void)
 
 	bfree(hotkeys->mute);
 	bfree(hotkeys->unmute);
+	bfree(hotkeys->monitor);
+	bfree(hotkeys->unmonitor);
 	bfree(hotkeys->push_to_mute);
 	bfree(hotkeys->push_to_talk);
 	bfree(hotkeys->sceneitem_show);
@@ -2226,6 +2230,10 @@ static obs_source_t *obs_load_source_type(obs_data_t *source_data,
 	obs_data_set_default_bool(source_data, "muted", false);
 	obs_source_set_muted(source, obs_data_get_bool(source_data, "muted"));
 
+	obs_data_set_default_bool(source_data, "monitoring", false);
+	obs_source_set_monitoring_state(
+		source, obs_data_get_bool(source_data, "monitoring"));
+
 	obs_data_set_default_bool(source_data, "push-to-mute", false);
 	obs_source_enable_push_to_mute(
 		source, obs_data_get_bool(source_data, "push-to-mute"));
@@ -2368,6 +2376,7 @@ obs_data_t *obs_save_source(obs_source_t *source)
 	const char *v_id = source->info.id;
 	bool enabled = obs_source_enabled(source);
 	bool muted = obs_source_muted(source);
+	bool monitoring = obs_source_get_monitoring_state(source);
 	bool push_to_mute = obs_source_push_to_mute_enabled(source);
 	uint64_t ptm_delay = obs_source_get_push_to_mute_delay(source);
 	bool push_to_talk = obs_source_push_to_talk_enabled(source);
@@ -2398,6 +2407,7 @@ obs_data_t *obs_save_source(obs_source_t *source)
 	obs_data_set_double(source_data, "balance", balance);
 	obs_data_set_bool(source_data, "enabled", enabled);
 	obs_data_set_bool(source_data, "muted", muted);
+	obs_data_set_bool(source_data, "monitoring", monitoring);
 	obs_data_set_bool(source_data, "push-to-mute", push_to_mute);
 	obs_data_set_int(source_data, "push-to-mute-delay", ptm_delay);
 	obs_data_set_bool(source_data, "push-to-talk", push_to_talk);
