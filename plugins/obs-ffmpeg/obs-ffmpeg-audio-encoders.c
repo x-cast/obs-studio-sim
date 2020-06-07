@@ -334,7 +334,7 @@ static obs_properties_t *enc_properties(void *unused)
 
 	obs_properties_t *props = obs_properties_create();
 	obs_properties_add_int(props, "bitrate", obs_module_text("Bitrate"), 64,
-			       1024, 32);
+			       5120, 32);
 	return props;
 }
 
