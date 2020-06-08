@@ -842,7 +842,7 @@ bool obs_module_load(void)
 	struct obs_source_info asio_input_capture = {};
 	asio_input_capture.id = "asio_input_capture";
 	asio_input_capture.type = OBS_SOURCE_TYPE_INPUT;
-	asio_input_capture.output_flags = OBS_SOURCE_AUDIO;
+	asio_input_capture.output_flags = OBS_SOURCE_AUDIO | OBS_SOURCE_DO_NOT_DUPLICATE;
 	asio_input_capture.create = ASIOPlugin::Create;
 	asio_input_capture.destroy = ASIOPlugin::Destroy;
 	asio_input_capture.update = ASIOPlugin::Update;
