@@ -141,6 +141,8 @@ template<class _T> void register_plugin(const char *id)
 
 	std::string s = std::string("Rescan ") + f.getName().toStdString();
 	obs_frontend_add_tools_menu_item(s.c_str(), rescan, nullptr);
+	FileSearchPath fs = f.getDefaultLocationsToSearch();
+	set_search_paths(f, fs);
 	rescan();
 }
 
