@@ -39,9 +39,15 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win-asio", "en-US")
 #define blog(level, msg, ...) blog(level, "asio-input: " msg, ##__VA_ARGS__)
 
 static void fill_out_devices(obs_property_t *prop);
-
-static juce::AudioIODeviceType *deviceTypeAsio =
+#ifdef _WIN32
+static juce::AudioIODeviceType *deviceType =
 	AudioIODeviceType::createAudioIODeviceType_ASIO();
+#endif
+
+#ifdef __APPLE__
+static juce::AudioIODeviceType *deviceType =
+	AudioIODeviceType::createAudioIODeviceType_CoreAudio();
+#endif
 
 class ASIOPlugin;
 class AudioCB;
@@ -453,7 +459,12 @@ public:
 			       "Authors:\r\n"
 			       "Andersama (main author) & pkv\r\n";
 		mybox.setText(text);
+#ifdef _WIN32
 		mybox.setIconPixmap(QPixmap(":/res/images/asiologo.png"));
+#endif
+#ifdef __APPLE__
+		mybox.setIconPixmap(QPixmap(":/res/images/jucepng"));
+#endif
 		mybox.setWindowTitle(QString("Credits: obs-asio"));
 		mybox.exec();
 		return true;
@@ -478,9 +489,14 @@ public:
 		obs_property_set_modified_callback2(devices,
 						    asio_device_changed, vptr);
 		fill_out_devices(devices);
+#ifdef _WIN32
 		obs_property_set_long_description(
 			devices, obs_module_text("ASIO Devices"));
-
+#endif
+#ifdef __APPLE__
+		obs_property_set_long_description(devices,
+						  obs_module_text("Devices"));
+#endif
 		format = obs_properties_add_list(props, "speaker_layout",
 						 obs_module_text("Format"),
 						 OBS_COMBO_TYPE_LIST,
@@ -533,7 +549,7 @@ public:
 			if (n == name) {
 				if (!device) {
 					String deviceName = name.c_str();
-					device = deviceTypeAsio->createDevice(
+					device = deviceType->createDevice(
 						deviceName, deviceName);
 					cb->setDevice(device, name.c_str());
 				}
@@ -658,7 +674,12 @@ public:
 	static const char *Name(void *unused)
 	{
 		UNUSED_PARAMETER(unused);
+#ifdef _WIN32
 		return obs_module_text("ASIO Input Capture");
+#endif
+#ifdef __APPLE__
+		return obs_module_text("CoreAudio Input Capture (Juce)");
+#endif
 	}
 };
 
@@ -693,8 +714,8 @@ static bool fill_out_channels_modified(obs_properties_t *props,
 		if (n == name) {
 			if (!device) {
 				String deviceName = name.c_str();
-				device = deviceTypeAsio->createDevice(
-					deviceName, deviceName);
+				device = deviceType->createDevice(deviceName,
+								  deviceName);
 				cb->setDevice(device, name.c_str());
 			}
 			_device = device;
@@ -793,7 +814,7 @@ static bool asio_layout_changed(obs_properties_t *props, obs_property_t *list,
 
 static void fill_out_devices(obs_property_t *prop)
 {
-	StringArray deviceNames(deviceTypeAsio->getDeviceNames());
+	StringArray deviceNames(deviceType->getDeviceNames());
 	for (int j = 0; j < deviceNames.size(); j++) {
 		bool found = false;
 		for (int i = 0; i < callbacks.size(); i++) {
@@ -829,8 +850,8 @@ bool obs_module_load(void)
 
 	MessageManager::getInstance();
 
-	deviceTypeAsio->scanForDevices();
-	StringArray deviceNames(deviceTypeAsio->getDeviceNames());
+	deviceType->scanForDevices();
+	StringArray deviceNames(deviceType->getDeviceNames());
 	for (int j = 0; j < deviceNames.size(); j++) {
 		char *name = bstrdup(deviceNames[j].toStdString().c_str());
 
@@ -838,11 +859,17 @@ bool obs_module_load(void)
 		bfree(name);
 		callbacks.push_back(cb);
 	}
-
+#ifdef _WIN32
 	struct obs_source_info asio_input_capture = {};
 	asio_input_capture.id = "asio_input_capture";
+#endif
+#ifdef __APPLE__
+	struct obs_source_info coreaudio_input_capture = {};
+	asio_input_capture.id = "coreaudio_input_capture";
+#endif
 	asio_input_capture.type = OBS_SOURCE_TYPE_INPUT;
-	asio_input_capture.output_flags = OBS_SOURCE_AUDIO | OBS_SOURCE_DO_NOT_DUPLICATE;
+	asio_input_capture.output_flags = OBS_SOURCE_AUDIO |
+					  OBS_SOURCE_DO_NOT_DUPLICATE;
 	asio_input_capture.create = ASIOPlugin::Create;
 	asio_input_capture.destroy = ASIOPlugin::Destroy;
 	asio_input_capture.update = ASIOPlugin::Update;
@@ -871,5 +898,5 @@ void obs_module_unload(void)
 		delete cb;
 	}
 
-	delete deviceTypeAsio;
+	delete deviceType;
 }
