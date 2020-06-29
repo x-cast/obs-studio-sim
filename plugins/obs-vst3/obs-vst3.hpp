@@ -21,8 +21,7 @@ int get_max_obs_channels()
 	static int channels = 0;
 	if (channels > 0) {
 		return channels;
-	}
-	else {
+	} else {
 		for (int i = 0; i < 1024; i++) {
 			int c = get_audio_channels((speaker_layout)i);
 			if (c > channels)
@@ -33,13 +32,13 @@ int get_max_obs_channels()
 }
 
 const int          obs_output_frames = AUDIO_OUTPUT_FRAMES;
-const volatile int obs_max_channels = get_max_obs_channels();
+const volatile int obs_max_channels  = get_max_obs_channels();
 
 #if JUCE_PLUGINHOST_LADSPA && JUCE_LINUX
-StringArray get_paths(LADSPAPluginFormat &f);
+StringArray    get_paths(LADSPAPluginFormat &f);
 FileSearchPath get_search_paths(LADSPAPluginFormat &f);
-void set_paths(LADSPAPluginFormat &f, StringArray p);
-void set_search_paths(LADSPAPluginFormat &f, FileSearchPath p);
+void           set_paths(LADSPAPluginFormat &f, StringArray p);
+void           set_search_paths(LADSPAPluginFormat &f, FileSearchPath p);
 #endif
 
 #if JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_IOS)
@@ -65,11 +64,11 @@ void           set_search_paths(AudioUnitPluginFormat &f, FileSearchPath p);
 
 template<typename ValueType>
 Point<ValueType> physicalToLogical(
-	Point<ValueType> point, const juce::Displays::Display *useScaleFactorOfDisplay = nullptr)
+		Point<ValueType> point, const juce::Displays::Display *useScaleFactorOfDisplay = nullptr)
 {
 	auto &display = useScaleFactorOfDisplay != nullptr
-		? *useScaleFactorOfDisplay
-		: Desktop::getInstance().getDisplays().findDisplayForPoint(point.roundToInt(), true);
+			? *useScaleFactorOfDisplay
+			: Desktop::getInstance().getDisplays().findDisplayForPoint(point.roundToInt(), true);
 
 	auto globalScale = Desktop::getInstance().getGlobalScaleFactor();
 
@@ -82,7 +81,7 @@ Point<ValueType> physicalToLogical(
 class PluginWindow : public DialogWindow {
 public:
 	PluginWindow(const String &name, Colour backgroundColour, bool escapeKeyTriggersCloseButton,
-		bool addToDesktop = true)
+			bool addToDesktop = true)
 		: DialogWindow(name, backgroundColour, escapeKeyTriggersCloseButton, addToDesktop)
 	{
 		setUsingNativeTitleBar(true);
@@ -104,7 +103,7 @@ private:
 	std::unique_ptr<AudioPluginInstance> vst_instance;
 	std::unique_ptr<AudioPluginInstance> new_vst_instance;
 
-	AudioProcessorEditor *editor = nullptr;
+	AudioProcessorEditor *editor  = nullptr;
 	obs_source_t *        context = nullptr;
 	juce::MemoryBlock     vst_state;
 	obs_data_t *          vst_settings = nullptr;
@@ -112,19 +111,19 @@ private:
 	juce::String          current_name = "";
 
 	PluginWindow *                 dialog = nullptr;
-	juce::AudioProcessorParameter *param = nullptr;
+	juce::AudioProcessorParameter *param  = nullptr;
 
 	CriticalSection menu_update;
 
 	MidiMessageCollector       midi_collector;
 	std::unique_ptr<MidiInput> midi_input;
-	juce::String               current_midi = "";
+	juce::String               current_midi        = "";
 	double                     current_sample_rate = 0.0;
-	bool                       dpi_aware = true;
+	bool                       dpi_aware           = true;
 
 	bool was_open = false;
-	bool enabled = true;
-	bool swap = false;
+	bool enabled  = true;
+	bool swap     = false;
 
 	void save_state(AudioProcessor *processor)
 	{
@@ -165,7 +164,7 @@ private:
 	}
 
 	void change_vst(std::unique_ptr<AudioPluginInstance> &inst, juce::String err, obs_audio_info aoi,
-		juce::String file, juce::String state)
+			juce::String file, juce::String state)
 	{
 		menu_update.enter();
 		close_vst(new_vst_instance);
@@ -183,8 +182,7 @@ private:
 				m.fromBase64Encoding(state);
 				new_vst_instance->setStateInformation(m.getData(), m.getSize());
 				vst_settings = obs_data_create();
-			}
-			else {
+			} else {
 				obs_data_clear(vst_settings);
 			}
 
@@ -193,14 +191,13 @@ private:
 			current_name = new_vst_instance->getName();
 			if (was_open)
 				host_clicked(new_vst_instance.get());
-		}
-		else {
+		} else {
 			AlertWindow::showMessageBoxAsync(
-				AlertWindow::WarningIcon, TRANS("Couldn't create plugin"), err);
+					AlertWindow::WarningIcon, TRANS("Couldn't create plugin"), err);
 			current_name = "";
 		}
 		current_file = file;
-		swap = true;
+		swap         = true;
 		menu_update.exit();
 	}
 
@@ -208,14 +205,14 @@ private:
 	{
 		static PluginFormat plugin_format;
 
-		obs_audio_info aoi = { 0 };
-		bool           got_audio = obs_get_audio_info(&aoi);
-		juce::String   file = obs_data_get_string(settings, "effect");
-		juce::String   plugin = obs_data_get_string(settings, "desc");
-		juce::String   mididevice = obs_data_get_string(settings, "midi");
+		obs_audio_info aoi           = {0};
+		bool           got_audio     = obs_get_audio_info(&aoi);
+		juce::String   file          = obs_data_get_string(settings, "effect");
+		juce::String   plugin        = obs_data_get_string(settings, "desc");
+		juce::String   mididevice    = obs_data_get_string(settings, "midi");
 		bool           dpi_awareness = obs_data_get_bool(settings, "dpi_aware");
-		bool           was_showing = host_showing();
-		bool           was_open = host_open();
+		bool           was_showing   = host_showing();
+		bool           was_open      = host_open();
 		if (dpi_awareness != dpi_aware) {
 			host_close();
 			if (editor)
@@ -239,11 +236,10 @@ private:
 
 		if (mididevice.compare("") == 0) {
 			midi_stop();
-		}
-		else if (mididevice.compare(current_midi) != 0) {
+		} else if (mididevice.compare(current_midi) != 0) {
 			midi_stop();
 
-			juce::StringArray devices = MidiInput::getDevices();
+			juce::StringArray devices     = MidiInput::getDevices();
 			int               deviceindex = 0;
 			for (; deviceindex < devices.size(); deviceindex++) {
 				if (devices[deviceindex].compare(mididevice) == 0)
@@ -268,8 +264,8 @@ private:
 		auto clear_vst = [this]() {
 			close_vst(new_vst_instance);
 			new_vst_instance = nullptr;
-			current_name = "";
-			swap = true;
+			current_name     = "";
+			swap             = true;
 		};
 
 		if (file.compare(current_file) != 0 || plugin.compare(current_name) != 0) {
@@ -284,10 +280,10 @@ private:
 			plugin_format.findAllTypesForFile(descs, file);
 			if (descs.size() > 0) {
 				if (got_audio) {
-					String state = obs_data_get_string(settings, "state");
+					String state    = obs_data_get_string(settings, "state");
 					auto   callback = [state, this, &aoi, file](
-						std::unique_ptr<AudioPluginInstance> inst,
-						const juce::String &                 err) {
+                                                                        std::unique_ptr<AudioPluginInstance> inst,
+                                                                        const juce::String &                 err) {
 						change_vst(inst, err, aoi, file, state);
 						decReferenceCount();
 					};
@@ -303,20 +299,17 @@ private:
 						// ensure the lifetime of this until after callback completes
 						incReferenceCount();
 						plugin_format.createPluginInstanceAsync(*descs[i],
-							(double)aoi.samples_per_sec, 2 * obs_output_frames,
-							std::move(callback));
-					}
-					else {
+								(double)aoi.samples_per_sec, 2 * obs_output_frames,
+								std::move(callback));
+					} else {
 						clear_vst();
 					}
 					descs.clear(false);
 					return;
-				}
-				else {
+				} else {
 					clear_vst();
 				}
-			}
-			else {
+			} else {
 				clear_vst();
 			}
 			descs.clear(false);
@@ -354,7 +347,7 @@ private:
 
 			struct obs_audio_info aoi;
 			bool                  audio_info = obs_get_audio_info(&aoi);
-			double                sps = (double)aoi.samples_per_sec;
+			double                sps        = (double)aoi.samples_per_sec;
 
 			if (audio_info) {
 				vst_instance->prepareToPlay(sps, audio->frames);
@@ -414,8 +407,7 @@ public:
 			if (!dpi_aware && (!current_name.contains("Kontakt") || !current_name.contains("BIAS"))) {
 				disableDPIAwareness.reset(new ScopedDPIAwarenessDisabler());
 				editor = inst->createEditorIfNeeded();
-			}
-			else {
+			} else {
 				editor = inst->createEditorIfNeeded();
 			}
 #else
@@ -431,10 +423,10 @@ public:
 				if (!dialog->isOnDesktop()) {
 					dialog->setOpaque(true);
 					dialog->addToDesktop(ComponentPeer::StyleFlags::windowHasCloseButton |
-						ComponentPeer::StyleFlags::windowHasTitleBar |
-						ComponentPeer::StyleFlags::
-						windowHasMinimiseButton,
-						nullptr);
+									ComponentPeer::StyleFlags::windowHasTitleBar |
+									ComponentPeer::StyleFlags::
+											windowHasMinimiseButton,
+							nullptr);
 				}
 				dialog->setVisible(editor);
 				if (editor) {
@@ -491,12 +483,12 @@ public:
 	}
 
 	static bool vst_selected_modified(
-		void *vptr, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+			void *vptr, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 	{
 		static PluginFormat plugin_format;
 
 		obs_property_t *desc_list = obs_properties_get(props, "desc");
-		juce::String    file = obs_data_get_string(settings, "effect");
+		juce::String    file      = obs_data_get_string(settings, "effect");
 
 		obs_property_list_clear(desc_list);
 
@@ -517,7 +509,7 @@ public:
 	}
 
 	static bool midi_selected_modified(
-		void *vptr, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+			void *vptr, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
 	{
 		obs_property_list_clear(property);
 		juce::StringArray devices = MidiInput::getDevices();
@@ -544,15 +536,15 @@ public:
 		obs_property_t *vst_host_button;
 		obs_property_t *dpi_aware;
 
-		vst_list = obs_properties_add_list(
-			props, "effect", obs_module_text("Plugin"), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+		vst_list = obs_properties_add_list(props, "effect", obs_module_text("Plugin"), OBS_COMBO_TYPE_LIST,
+				OBS_COMBO_FORMAT_STRING);
 		obs_property_set_modified_callback2(vst_list, vst_selected_modified, plugin);
 
-		desc_list = obs_properties_add_list(
-			props, "desc", obs_module_text("Plugin Description"), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+		desc_list = obs_properties_add_list(props, "desc", obs_module_text("Plugin Description"),
+				OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
 		midi_list = obs_properties_add_list(
-			props, "midi", obs_module_text("Midi"), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+				props, "midi", obs_module_text("Midi"), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 		obs_property_set_modified_callback2(midi_list, midi_selected_modified, nullptr);
 
 		vst_host_button = obs_properties_add_button2(props, "vst_button", "Show", vst_host_clicked, plugin);
@@ -565,7 +557,7 @@ public:
 			juce::StringArray paths = get_paths(plugin_format);
 			if (paths.size() < 1) {
 				juce::FileSearchPath s = get_search_paths(plugin_format);
-				paths = plugin_format.searchPathsForPlugins(s, true, true);
+				paths                  = plugin_format.searchPathsForPlugins(s, true, true);
 				set_paths(plugin_format, paths);
 			}
 
@@ -573,7 +565,7 @@ public:
 			for (int i = 0; i < paths.size(); i++) {
 				juce::String name = plugin_format.getNameOfPluginFromIdentifier(paths[i]);
 				obs_property_list_add_string(
-					vst_list, name.toStdString().c_str(), paths[i].toStdString().c_str());
+						vst_list, name.toStdString().c_str(), paths[i].toStdString().c_str());
 			}
 		}
 

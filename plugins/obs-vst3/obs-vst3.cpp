@@ -19,11 +19,10 @@ OBS_MODULE_USE_DEFAULT_LOCALE("obs-vst3", "en-US")
 
 #define blog(level, msg, ...) blog(level, "obs-vst3: " msg, ##__VA_ARGS__)
 
-
 #if JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_IOS)
 static FileSearchPath search_vst;
 StringArray           paths_vst;
-StringArray get_paths(VSTPluginFormat &f)
+StringArray           get_paths(VSTPluginFormat &f)
 {
 	UNUSED_PARAMETER(f);
 	return paths_vst;
@@ -46,7 +45,7 @@ void set_search_paths(VSTPluginFormat &f, FileSearchPath p)
 #if JUCE_PLUGINHOST_VST3 && (JUCE_MAC || JUCE_WINDOWS)
 static FileSearchPath search_vst3;
 StringArray           paths_vst3;
-StringArray get_paths(VST3PluginFormat &f)
+StringArray           get_paths(VST3PluginFormat &f)
 {
 	UNUSED_PARAMETER(f);
 	return paths_vst3;
@@ -114,27 +113,27 @@ void set_search_paths(AudioUnitPluginFormat &f, FileSearchPath p)
 
 template<class _T> void register_plugin(const char *id)
 {
-	struct obs_source_info _filter = { 0 };
-	_filter.id = id;
-	_filter.type = OBS_SOURCE_TYPE_FILTER;
-	_filter.output_flags = OBS_SOURCE_AUDIO;
-	_filter.get_name = PluginHost<_T>::Name;
-	_filter.create = PluginHost<_T>::Create;
-	_filter.destroy = PluginHost<_T>::Destroy;
-	_filter.update = PluginHost<_T>::Update;
-	_filter.filter_audio = PluginHost<_T>::Filter_Audio;
-	_filter.get_properties = PluginHost<_T>::Properties;
-	_filter.save = PluginHost<_T>::Save;
+	struct obs_source_info _filter = {0};
+	_filter.id                     = id;
+	_filter.type                   = OBS_SOURCE_TYPE_FILTER;
+	_filter.output_flags           = OBS_SOURCE_AUDIO;
+	_filter.get_name               = PluginHost<_T>::Name;
+	_filter.create                 = PluginHost<_T>::Create;
+	_filter.destroy                = PluginHost<_T>::Destroy;
+	_filter.update                 = PluginHost<_T>::Update;
+	_filter.filter_audio           = PluginHost<_T>::Filter_Audio;
+	_filter.get_properties         = PluginHost<_T>::Properties;
+	_filter.save                   = PluginHost<_T>::Save;
 
 	obs_register_source(&_filter);
 
 	static _T f;
 
 	auto rescan = [](void * = nullptr) {
-		static _T      _f;
+		static _T _f;
 		if (_f.canScanForPlugins()) {
 			FileSearchPath s_path = get_search_paths(_f);
-			StringArray p = _f.searchPathsForPlugins(s_path, true, true);
+			StringArray    p      = _f.searchPathsForPlugins(s_path, true, true);
 			set_paths(_f, p);
 		}
 	};
@@ -150,7 +149,7 @@ bool obs_module_load(void)
 {
 	int version = (JUCE_MAJOR_VERSION << 16) | (JUCE_MINOR_VERSION << 8) | JUCE_BUILDNUMBER;
 	blog(LOG_INFO, "JUCE Version: (%i) %i.%i.%i", version, JUCE_MAJOR_VERSION, JUCE_MINOR_VERSION,
-		JUCE_BUILDNUMBER);
+			JUCE_BUILDNUMBER);
 
 	MessageManager::getInstance();
 #if JUCE_PLUGINHOST_VST3 && (JUCE_MAC || JUCE_WINDOWS)
