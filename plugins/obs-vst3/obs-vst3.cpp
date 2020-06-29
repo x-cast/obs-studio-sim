@@ -12,13 +12,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* For full GPL v2 compatibility it is required to build libs with
- * our open source sdk instead of steinberg sdk , see our fork:
- * https://github.com/pkviet/portaudio , branch : openasio
- * If you build with original asio sdk, you are free to do so to the
- * extent that you do not distribute your binaries.
- */
-
 #include "obs-vst3.hpp"
 
 OBS_DECLARE_MODULE()
@@ -26,115 +19,150 @@ OBS_MODULE_USE_DEFAULT_LOCALE("obs-vst3", "en-US")
 
 #define blog(level, msg, ...) blog(level, "obs-vst3: " msg, ##__VA_ARGS__)
 
-using VST3Host = PluginHost<VST3PluginFormat>;
-using VSTHost  = PluginHost<VSTPluginFormat>;
 
-static FileSearchPath search;
-StringArray           paths;
-
-static FileSearchPath search_2x;
-StringArray           paths_2x;
-
+#if JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_IOS)
+static FileSearchPath search_vst;
+StringArray           paths_vst;
 StringArray get_paths(VSTPluginFormat &f)
 {
 	UNUSED_PARAMETER(f);
-	return paths_2x;
+	return paths_vst;
 }
-
-StringArray get_paths(VST3PluginFormat &f)
-{
-	UNUSED_PARAMETER(f);
-	return paths;
-}
-
 FileSearchPath get_search_paths(VSTPluginFormat &f)
 {
 	UNUSED_PARAMETER(f);
-	return search_2x;
+	return search_vst;
 }
+void set_paths(VSTPluginFormat &f, StringArray p)
+{
+	paths_vst = p;
+}
+void set_search_paths(VSTPluginFormat &f, FileSearchPath p)
+{
+	search_vst = p;
+}
+#endif
 
+#if JUCE_PLUGINHOST_VST3 && (JUCE_MAC || JUCE_WINDOWS)
+static FileSearchPath search_vst3;
+StringArray           paths_vst3;
+StringArray get_paths(VST3PluginFormat &f)
+{
+	UNUSED_PARAMETER(f);
+	return paths_vst3;
+}
 FileSearchPath get_search_paths(VST3PluginFormat &f)
 {
 	UNUSED_PARAMETER(f);
-	return search;
+	return search_vst3;
 }
-
-void set_paths(VSTPluginFormat &f, StringArray p)
-{
-	paths_2x = p;
-}
-
 void set_paths(VST3PluginFormat &f, StringArray p)
 {
-	paths = p;
+	paths_vst3 = p;
 }
-
-void set_search_paths(VSTPluginFormat &f, FileSearchPath p)
-{
-	search_2x = p;
-}
-
 void set_search_paths(VST3PluginFormat &f, FileSearchPath p)
 {
-	search = p;
+	search_vst3 = p;
+}
+#endif
+
+#if JUCE_PLUGINHOST_LADSPA && JUCE_LINUX
+static FileSearchPath search_ladspa;
+StringArray           paths_ladspa;
+StringArray           get_paths(LADSPAPluginFormat &f)
+{
+	UNUSED_PARAMETER(f);
+	return paths_ladspa;
+}
+FileSearchPath get_search_paths(LADSPAPluginFormat &f)
+{
+	UNUSED_PARAMETER(f);
+	return search_ladspa;
+}
+void set_paths(LADSPAPluginFormat &f, StringArray p)
+{
+	paths_ladspa = p;
+}
+void set_search_paths(LADSPAPluginFormat &f, FileSearchPath p)
+{
+	search_ladspa = p;
+}
+#endif
+
+#if JUCE_PLUGINHOST_AU && (JUCE_MAC || JUCE_IOS)
+static FileSearchPath search_au;
+StringArray           paths_au;
+StringArray           get_paths(AudioUnitPluginFormat &f)
+{
+	UNUSED_PARAMETER(f);
+	return paths_au;
+}
+FileSearchPath get_search_paths(AudioUnitPluginFormat &f)
+{
+	UNUSED_PARAMETER(f);
+	return search_au;
+}
+void set_paths(AudioUnitPluginFormat &f, StringArray p)
+{
+	paths_au = p;
+}
+void set_search_paths(AudioUnitPluginFormat &f, FileSearchPath p)
+{
+	search_au = p;
+}
+#endif
+
+template<class _T> void register_plugin(const char *id)
+{
+	struct obs_source_info _filter = { 0 };
+	_filter.id = id;
+	_filter.type = OBS_SOURCE_TYPE_FILTER;
+	_filter.output_flags = OBS_SOURCE_AUDIO;
+	_filter.get_name = PluginHost<_T>::Name;
+	_filter.create = PluginHost<_T>::Create;
+	_filter.destroy = PluginHost<_T>::Destroy;
+	_filter.update = PluginHost<_T>::Update;
+	_filter.filter_audio = PluginHost<_T>::Filter_Audio;
+	_filter.get_properties = PluginHost<_T>::Properties;
+	_filter.save = PluginHost<_T>::Save;
+
+	obs_register_source(&_filter);
+
+	static _T f;
+
+	auto rescan = [](void * = nullptr) {
+		static _T      _f;
+		if (_f.canScanForPlugins()) {
+			FileSearchPath s_path = get_search_paths(_f);
+			StringArray p = _f.searchPathsForPlugins(s_path, true, true);
+			set_paths(_f, p);
+		}
+	};
+
+	std::string s = std::string("Rescan ") + f.getName().toStdString();
+	obs_frontend_add_tools_menu_item(s.c_str(), rescan, nullptr);
+	rescan();
 }
 
 bool obs_module_load(void)
 {
-	MessageManager::getInstance();
-
-	VST3PluginFormat vst3format;
-	VSTPluginFormat  vst2format;
-
-	struct obs_source_info vst3_filter = {0};
-	vst3_filter.id                     = "vst_filter_juce_3x";
-	vst3_filter.type                   = OBS_SOURCE_TYPE_FILTER;
-	vst3_filter.output_flags           = OBS_SOURCE_AUDIO;
-	vst3_filter.get_name               = VST3Host::Name;
-	vst3_filter.create                 = VST3Host::Create;
-	vst3_filter.destroy                = VST3Host::Destroy;
-	vst3_filter.update                 = VST3Host::Update;
-	vst3_filter.filter_audio           = VST3Host::Filter_Audio;
-	vst3_filter.get_properties         = VST3Host::Properties;
-	// vst3_filter.save                   = VST3Host::Save;
-
-	struct obs_source_info vst_filter = {0};
-	vst_filter.id                     = "vst_filter_juce_2x";
-	vst_filter.type                   = OBS_SOURCE_TYPE_FILTER;
-	vst_filter.output_flags           = OBS_SOURCE_AUDIO;
-	vst_filter.get_name               = VSTHost::Name;
-	vst_filter.create                 = VSTHost::Create;
-	vst_filter.destroy                = VSTHost::Destroy;
-	vst_filter.update                 = VSTHost::Update;
-	vst_filter.filter_audio           = VSTHost::Filter_Audio;
-	vst_filter.get_properties         = VSTHost::Properties;
-	// vst_filter.save                   = VSTHost::Save;
-
 	int version = (JUCE_MAJOR_VERSION << 16) | (JUCE_MINOR_VERSION << 8) | JUCE_BUILDNUMBER;
 	blog(LOG_INFO, "JUCE Version: (%i) %i.%i.%i", version, JUCE_MAJOR_VERSION, JUCE_MINOR_VERSION,
-			JUCE_BUILDNUMBER);
+		JUCE_BUILDNUMBER);
 
-	obs_register_source(&vst3_filter);
-	obs_register_source(&vst_filter);
-
-	auto rescan_vst3 = [](void * = nullptr) {
-		VST3PluginFormat format;
-		if (format.canScanForPlugins())
-			paths = format.searchPathsForPlugins(search, true, true);
-	};
-	obs_frontend_add_tools_menu_item("Rescan VST3", rescan_vst3, nullptr);
-	search = vst3format.getDefaultLocationsToSearch();
-	rescan_vst3();
-
-	auto rescan_vst2 = [](void * = nullptr) {
-		VSTPluginFormat format;
-		if (format.canScanForPlugins())
-			paths_2x = format.searchPathsForPlugins(search_2x, true, true);
-	};
-	obs_frontend_add_tools_menu_item("Rescan VST", rescan_vst2, nullptr);
-	search_2x = vst2format.getDefaultLocationsToSearch();
-	rescan_vst2();
-
+	MessageManager::getInstance();
+#if JUCE_PLUGINHOST_VST3 && (JUCE_MAC || JUCE_WINDOWS)
+	register_plugin<VST3PluginFormat>("vst_filter_juce_vst3");
+#endif
+#if JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_IOS)
+	register_plugin<VSTPluginFormat>("vst_filter_juce_vst2");
+#endif
+#if JUCE_PLUGINHOST_LADSPA && JUCE_LINUX
+	register_plugin<LADSPAPluginFormat>("vst_filter_juce_ladspa");
+#endif
+#if JUCE_PLUGINHOST_AU && (JUCE_MAC || JUCE_IOS)
+	register_plugin<AudioUnitPluginFormat>("vst_filter_juce_au");
+#endif
 	return true;
 }
 
