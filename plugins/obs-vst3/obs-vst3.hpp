@@ -573,7 +573,7 @@ public:
 			for (int i = 0; i < paths.size(); i++) {
 				juce::String name = plugin_format.getNameOfPluginFromIdentifier(paths[i]);
 				obs_property_list_add_string(
-					vst_list, paths[i].toStdString().c_str(), name.toStdString().c_str());
+					vst_list, name.toStdString().c_str(), paths[i].toStdString().c_str());
 			}
 		}
 
