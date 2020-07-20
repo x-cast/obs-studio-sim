@@ -3915,9 +3915,35 @@ obs_source_output_audio_track(obs_source_t *source,
 {
 	struct obs_audio_data *output;
 
+	if (!obs_source_valid(source, "obs_source_output_audio_track"))
+		return NULL;
+	if (!obs_ptr_valid(audio_in, "obs_source_output_audio_track"))
+		return NULL;
+	if (!audio_in)
+		return NULL;
+
+	/* sets unused data pointers to NULL automatically because apparently
+	 * some filter plugins aren't checking the actual channel count, and
+	 * instead are checking to see whether the pointer is non-zero. */
+	struct obs_source_audio audio = *audio_in;
+	size_t channels = get_audio_planes(audio.format, audio.speakers);
+	for (size_t i = channels; i < MAX_AUDIO_CHANNELS; i++)
+		audio.data[i] = NULL;
+
+	process_audio(source, &audio);
+
+	pthread_mutex_lock(&source->filter_mutex);
+	output = filter_async_audio(source, &source->audio_data);
+	pthread_mutex_unlock(&source->filter_mutex);
+	return output;
+}
+
+void obs_source_output_audio(obs_source_t *source,
+			     const struct obs_source_audio *audio_in)
+{
+	struct obs_audio_data *output;
+
 	if (!obs_source_valid(source, "obs_source_output_audio"))
-		return;
-	if (destroying(source))
 		return;
 	if (!obs_ptr_valid(audio_in, "obs_source_output_audio"))
 		return;
@@ -3934,6 +3960,7 @@ obs_source_output_audio_track(obs_source_t *source,
 
 	pthread_mutex_lock(&source->filter_mutex);
 	output = filter_async_audio(source, &source->audio_data);
+
 	if (output) {
 		struct audio_data data;
 
@@ -3947,18 +3974,8 @@ obs_source_output_audio_track(obs_source_t *source,
 		source_output_audio_data(source, &data);
 		pthread_mutex_unlock(&source->audio_mutex);
 	}
-	pthread_mutex_unlock(&source->filter_mutex);
-	return output;
-}
 
-void obs_source_output_audio(obs_source_t *source,
-			     const struct obs_source_audio *audio)
-{
-	if (!obs_source_valid(source, "obs_source_output_audio"))
-		return;
-	if (!obs_ptr_valid(audio, "obs_source_output_audio"))
-		return;
-	obs_source_output_audio_track(source, audio);
+	pthread_mutex_unlock(&source->filter_mutex);
 }
 
 void remove_async_frame(obs_source_t *source, struct obs_source_frame *frame)
@@ -5457,8 +5474,7 @@ static inline void process_audio_source_tick(obs_source_t *source,
 			mix_and_val = 1;
 		}
 
-		if ((source->audio_mixers & mix_and_val) == 0 ||
-		    (mixers & mix_and_val) == 0) {
+		if ((source->audio_mixers & mix_and_val) == 0) {
 			memset(source->audio_output_buf[mix][0], 0,
 			       size * channels);
 			continue;

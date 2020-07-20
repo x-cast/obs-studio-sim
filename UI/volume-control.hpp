@@ -355,7 +355,7 @@ signals:
 	void ConfigClicked();
 
 public:
-	explicit VolControl(OBSSource source, bool *mute,
+	explicit VolControl(OBSSource source, float *volume, bool *mute,
 			    bool showConfig = false, bool vertical = false,
 			    bool showMon = false, bool showTracks = false,
 			    int trackIndex = -1);

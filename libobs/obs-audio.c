@@ -689,16 +689,25 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 				&s);
 
 			if (o) {
-				for (size_t j = 0; j < channels; j++)
+				for (size_t j = 0; j < channels; j++) {
 					memcpy(audio_out.data[j], o->data[j],
 					       AUDIO_OUTPUT_FRAMES *
 						       sizeof(float));
+					memcpy(mixes[i].data[j], o->data[j],
+					       AUDIO_OUTPUT_FRAMES *
+						       sizeof(float));
+				}
+
 				/* Mute output */
 			} else {
-				for (size_t j = 0; j < channels; j++)
+				for (size_t j = 0; j < channels; j++) {
 					memset(audio_out.data[j], 0,
 					       AUDIO_OUTPUT_FRAMES *
 						       sizeof(float));
+					memset(mixes[i].data[j], 0,
+					       AUDIO_OUTPUT_FRAMES *
+						       sizeof(float));
+				}
 			}
 			obs_audio_mix_lock();
 			volmeter_data_received(data->audio_mixes.meters[i],

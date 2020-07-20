@@ -323,9 +323,9 @@ void VolControl::setPeakMeterType(enum obs_peak_meter_type peakMeterType)
 	volMeter->setPeakMeterType(peakMeterType);
 }
 
-VolControl::VolControl(OBSSource source_, bool *mutePtr, bool showConfig,
-		       bool vertical, bool showMon, bool showTracks,
-		       int trackIndex)
+VolControl::VolControl(OBSSource source_, float *volume, bool *mutePtr,
+		       bool showConfig, bool vertical, bool showMon,
+		       bool showTracks, int trackIndex)
 	: source(std::move(source_)),
 	  levelTotal(0.0f),
 	  levelCount(0.0f),
@@ -638,6 +638,8 @@ VolControl::VolControl(OBSSource source_, bool *mutePtr, bool showConfig,
 
 		QWidget::connect(rec, SIGNAL(clicked(bool)), this,
 				 SLOT(SetRec(bool)));
+		obs_fader_attach_float(obs_fader, volume);
+		obs_volmeter_attach_float(obs_volmeter, volume);
 	}
 	/* tracks buttons for input mixer */
 	if (trackIndex < 0) {
@@ -671,9 +673,9 @@ VolControl::VolControl(OBSSource source_, bool *mutePtr, bool showConfig,
 			signal_handler_connect(
 				obs_source_get_signal_handler(source),
 				"audio_mixers", OBSSourceMixersChanged, this);
+		obs_fader_attach_source(obs_fader, source);
+		obs_volmeter_attach_source(obs_volmeter, source);
 	}
-	obs_fader_attach_source(obs_fader, source);
-	obs_volmeter_attach_source(obs_volmeter, source);
 
 	QString styleName = slider->style()->objectName();
 	QStyle *style;

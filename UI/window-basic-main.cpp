@@ -3834,7 +3834,7 @@ void OBSBasic::ActivateAudioSource(OBSSource source)
 		GetGlobalConfig(), "BasicWindow", "ShowMonitoringButton");
 	bool ShowTracksButtons = config_get_bool(
 		GetGlobalConfig(), "BasicWindow", "ShowTracksButtons");
-	VolControl *vol = new VolControl(source, NULL, true, vertical,
+	VolControl *vol = new VolControl(source, NULL, NULL, true, vertical,
 					 ShowMonitoringButton,
 					 ShowTracksButtons,
 					 SOURCE_IS_NOT_TRACK);
@@ -3890,6 +3890,7 @@ void OBSBasic::InitAudioMasterMixer()
 					"VerticalMasterVolControl");
 
 	obs_audio_mix_lock();
+	float *trackVol = obs_audio_mix_volumes();
 	obs_volmeter_t **meters = (obs_volmeter_t **)obs_audio_mix_meters();
 	obs_fader_t **faders = (obs_fader_t **)obs_audio_mix_faders();
 	bool *muted = obs_audio_mix_muted();
@@ -3897,8 +3898,8 @@ void OBSBasic::InitAudioMasterMixer()
 	VolControl *vol[MAX_AUDIO_MIXES];
 	bool hidden[MAX_AUDIO_MIXES];
 	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
-		vol[i] = new VolControl(tracks[i], &muted[i], true, vertical,
-					true, false, i);
+		vol[i] = new VolControl(tracks[i], &trackVol[i], &muted[i],
+					true, vertical, true, false, i);
 		meters[i] = vol[i]->GetMeter();
 		faders[i] = vol[i]->GetFader();
 		std::string trackNum = "Track" + std::to_string(i + 1) + "Name";
