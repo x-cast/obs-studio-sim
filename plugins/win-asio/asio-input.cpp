@@ -423,11 +423,14 @@ public:
 
 	ASIOPlugin::~ASIOPlugin()
 	{
-		AudioCB *cb = _listener->getCallback();
-		_listener->disconnect();
-		if (cb)
-			cb->remove_client(_listener);
-		delete _listener;
+		if (_listener) {
+			AudioCB *cb = _listener->getCallback();
+			_listener->disconnect();
+			if (cb)
+				cb->remove_client(_listener);
+			delete _listener;
+			_listener = nullptr;
+		}
 	}
 
 	static void *Create(obs_data_t *settings, obs_source_t *source)
@@ -896,7 +899,8 @@ void obs_module_unload(void)
 		}
 		device = nullptr;
 		delete cb;
+		callbacks[i] = nullptr;
 	}
-
+	callbacks.clear();
 	delete deviceType;
 }
