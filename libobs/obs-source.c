@@ -3934,6 +3934,16 @@ obs_source_output_audio_track(obs_source_t *source,
 
 	pthread_mutex_lock(&source->filter_mutex);
 	output = filter_async_audio(source, &source->audio_data);
+	if (output) {
+		struct audio_data data;
+		for (int i = 0; i < MAX_AV_PLANES; i++)
+			data.data[i] = output->data[i];
+		data.frames = output->frames;
+		data.timestamp = output->timestamp;
+		pthread_mutex_lock(&source->audio_mutex);
+		source_output_audio_data(source, &data);
+		pthread_mutex_unlock(&source->audio_mutex);
+	}
 	pthread_mutex_unlock(&source->filter_mutex);
 	return output;
 }
