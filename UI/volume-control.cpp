@@ -192,6 +192,7 @@ void VolControl::enableRecButton(bool show)
 void VolControl::checkMonButton(bool check)
 {
 	mon->setChecked(check);
+	SetMon(check);
 }
 
 void VolControl::showMonitoringButton(bool show)
