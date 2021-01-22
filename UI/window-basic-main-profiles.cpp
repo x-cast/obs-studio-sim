@@ -785,6 +785,7 @@ void OBSBasic::ChangeProfile()
 	RefreshProfiles();
 	config_save_safe(App()->GlobalConfig(), "tmp", nullptr);
 	UpdateTitleBar();
+	InitAudioMasterMixer();
 
 	Auth::Load();
 
