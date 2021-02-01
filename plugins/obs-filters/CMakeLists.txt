@@ -9,6 +9,10 @@ if(OS_WINDOWS)
     ENABLE_NVAFX
     "Enable building with NVIDIA Audio Effects SDK (requires redistributable to be installed)"
     ON)
+  option(
+    ENABLE_NVVFX
+    "Enable building with NVIDIA Video Effects SDK (requires redistributable to be installed)"
+    ON)
 endif()
 
 add_library(obs-filters MODULE)
@@ -95,6 +99,15 @@ else()
   set(LIBNVAFX_FOUND ON)
 endif()
 
+if(NOT ENABLE_NVVFX)
+  obs_status(DISABLED "Nvidia Video FX support")
+  set(LIBNVVFX_FOUND OFF)
+else()
+  obs_status(ENABLED "Nvidia Video FX support")
+  set(LIBNVVFX_FOUND ON)
+  target_compile_definitions(obs-filters PRIVATE LIBNVVFX_ENABLED)
+endif()
+
 if(TARGET Librnnoise::Librnnoise
    OR TARGET LibspeexDSP::LibspeexDSP
    OR LIBNVAFX_FOUND)
@@ -140,7 +153,8 @@ if(NOT OS_MACOS)
             data/luma_key_filter_v2.effect
             data/mask_alpha_filter.effect
             data/mask_color_filter.effect
-            data/sharpness.effect)
+            data/sharpness.effect
+            data/rtx_greenscreen.effect)
 
   get_target_property(_SOURCES obs-filters SOURCES)
   set(_FILTERS ${_SOURCES})
@@ -150,6 +164,14 @@ if(NOT OS_MACOS)
     TREE "${CMAKE_CURRENT_SOURCE_DIR}"
     PREFIX "Effect Files"
     FILES ${_FILTERS})
+endif()
+
+if(LIBNVVFX_FOUND)
+  target_sources(obs-filters PRIVATE nvidia-greenscreen-filter.c)
+  obs_status(
+    STATUS
+    "NVidia Video FX support enabled; requires redist to be installed by end-user"
+  )
 endif()
 
 target_include_directories(
