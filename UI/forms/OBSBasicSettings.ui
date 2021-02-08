@@ -5693,14 +5693,14 @@
                    <item row="0" column="1">
                     <widget class="QComboBox" name="bindToIP"/>
                    </item>
-                   <item row="2" column="1">
+                   <item row="3" column="1">
                     <widget class="QCheckBox" name="enableNewSocketLoop">
                      <property name="text">
                       <string>Basic.Settings.Advanced.Network.EnableNewSocketLoop</string>
                      </property>
                     </widget>
                    </item>
-                   <item row="3" column="1">
+                   <item row="4" column="1">
                     <widget class="QCheckBox" name="enableLowLatencyMode">
                      <property name="enabled">
                       <bool>false</bool>
@@ -5710,7 +5710,7 @@
                      </property>
                     </widget>
                    </item>
-                   <item row="2" column="0">
+                   <item row="3" column="0">
                     <spacer name="horizontalSpacer_7">
                      <property name="orientation">
                       <enum>Qt::Horizontal</enum>
@@ -5733,6 +5733,36 @@
                      </property>
                     </widget>
                    </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_68">
+                     <property name="text">
+                      <string>Basic.Settings.Advanced.Network.Dbr.Presets</string>
+                     </property>
+                     <property name="buddy">
+                      <cstring>dbrPresets</cstring>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QComboBox" name="dbrPresets">
+                     <property name="sizePolicy">
+                      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                       <horstretch>0</horstretch>
+                       <verstretch>0</verstretch>
+                      </sizepolicy>
+                     </property>
+                     <item>
+                      <property name="text">
+                       <string>Basic.Settings.Advanced.Network.Dbr.Presets.Fast</string>
+                      </property>
+                     </item>
+                     <item>
+                      <property name="text">
+                       <string>Basic.Settings.Advanced.Network.Dbr.Presets.Slow</string>
+                      </property>
+                     </item>
+                    </widget>
+                    </item>
                   </layout>
                  </widget>
                 </item>
