@@ -256,8 +256,6 @@ private:
 				midi_input->start();
 		}
 
-		save(settings);
-
 		juce::String err;
 		bool         found = false;
 
@@ -317,6 +315,8 @@ private:
 
 		if (was_open)
 			host_clicked();
+
+		save(settings);
 	}
 
 	void save(obs_data_t *settings)
