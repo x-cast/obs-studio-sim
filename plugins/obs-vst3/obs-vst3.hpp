@@ -146,7 +146,7 @@ private:
 		obs_data_set_double(vst_settings, idx.c_str(), newValue);
 	}
 
-	void audioProcessorChanged(AudioProcessor *processor)
+	void audioProcessorChanged(AudioProcessor *processor, const ChangeDetails &details)
 	{
 		save_state(processor);
 	}
