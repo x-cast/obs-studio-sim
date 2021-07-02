@@ -945,7 +945,7 @@ int obs_volmeter_get_nr_channels(obs_volmeter_t *volmeter)
 	else
 		source_nr_audio_channels = obs_nr_audio_channels;
 
-	return CLAMP(source_nr_audio_channels, 1, obs_nr_audio_channels);
+	return obs_nr_audio_channels; //CLAMP(source_nr_audio_channels, 1, obs_nr_audio_channels);
 }
 
 void obs_volmeter_add_callback(obs_volmeter_t *volmeter,
