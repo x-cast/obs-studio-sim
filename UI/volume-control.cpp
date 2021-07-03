@@ -639,8 +639,10 @@ VolControl::VolControl(OBSSource source_, float *volume, bool *mutePtr,
 
 		QWidget::connect(rec, SIGNAL(clicked(bool)), this,
 				 SLOT(SetRec(bool)));
-		obs_fader_attach_float(obs_fader, volume);
-		obs_volmeter_attach_float(obs_volmeter, volume);
+		//obs_fader_attach_float(obs_fader, volume);
+		//obs_volmeter_attach_float(obs_volmeter, volume);
+		obs_fader_attach_source(obs_fader, source);
+		obs_volmeter_attach_source(obs_volmeter, source);
 	}
 	/* tracks buttons for input mixer */
 	if (trackIndex < 0) {
