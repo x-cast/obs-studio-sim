@@ -2523,7 +2523,7 @@ void obs_load_track_sources(obs_data_array_t *array, obs_load_source_cb cb,
 		}
 		if (!tracks[i]) {
 			tracks[i] = obs_load_source(source_data);
-			obs_source_load(tracks[i]);
+			obs_source_load2(tracks[i]);
 		}
 		obs_data_release(source_data);
 	}
