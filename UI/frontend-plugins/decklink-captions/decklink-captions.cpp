@@ -163,3 +163,8 @@ void obs_module_post_load(void)
 
 	addOutputUI();
 }
+
+void obs_module_unload(void)
+{
+	delete captions;
+}
