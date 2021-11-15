@@ -814,7 +814,7 @@ static void obs_free_audio(void)
 		if (obs_info) {
 			int channels = get_audio_channels(obs_info->speakers);
 			for (size_t j = 0; j < channels; j++)
-				bfree(obs_info->audio_out.data[j]);
+				free(obs_info->audio_out.data[j]);
 		}
 		audio_output_close(audio->audio);
 	}
@@ -1455,9 +1455,10 @@ bool obs_reset_audio2(const struct obs_audio_info2 *oai)
 	ai.input_callback = audio_callback;
 	ai.audio_out = (struct audio_data){0};
 	ai.audio_out.frames = AUDIO_OUTPUT_FRAMES;
-	for (size_t j = 0; j < channels; j++)
+	for (size_t j = 0; j < channels; j++) {
 		ai.audio_out.data[j] =
-			bmalloc(AUDIO_OUTPUT_FRAMES * sizeof(float));
+			malloc(AUDIO_OUTPUT_FRAMES * sizeof(float));
+	}
 
 	blog(LOG_INFO, "---------------------------------");
 	blog(LOG_INFO,
