@@ -61,6 +61,7 @@ static bool fill_out_channels_modified(obs_properties_t *props,
 				       obs_data_t *settings);
 
 static std::vector<AudioCB *> callbacks;
+TimeSliceThread *global_thread;
 
 enum audio_format string_to_obs_audio_format(std::string format)
 {
@@ -305,7 +306,7 @@ public:
 		_name = bstrdup(name);
 	}
 
-	~AudioCB() { bfree(_name); }
+	~AudioCB(){	bfree(_name); }
 
 	void audioDeviceIOCallback(const float **inputChannelData,
 				   int numInputChannels,
@@ -330,10 +331,11 @@ public:
 	void add_client(AudioListener *client)
 	{
 		if (!_thread)
-			_thread = new TimeSliceThread("");
+			_thread = global_thread;
 
 		client->setCurrentCallback(this);
 		client->setReadIndex(_write_index);
+		int nb = _thread->getNumClients();
 		_thread->addTimeSliceClient(client);
 	}
 
@@ -373,18 +375,16 @@ public:
 		}
 
 		if (!_thread) {
-			_thread = new TimeSliceThread(name);
-			_thread->startThread();
+			_thread = global_thread;
 		} else {
 			for (int i = 0; i < _thread->getNumClients(); i++) {
 				AudioListener *l = static_cast<AudioListener *>(
 					_thread->getClient(i));
 				l->setCurrentCallback(this);
 			}
-			_thread->setCurrentThreadName(name);
-			if (!_thread->isThreadRunning())
-				_thread->startThread();
 		}
+		if (!_thread->isThreadRunning())
+			_thread->startThread(10);
 	}
 
 	void audioDeviceStopped()
@@ -428,6 +428,7 @@ public:
 			_listener->disconnect();
 			if (cb)
 				cb->remove_client(_listener);
+
 			delete _listener;
 			_listener = nullptr;
 		}
@@ -457,7 +458,7 @@ public:
 		QMainWindow *main_window =
 			(QMainWindow *)obs_frontend_get_main_window();
 		QMessageBox mybox(main_window);
-		QString text = "v.2.0.2\r\n © 2020, license GPL v3\r\n"
+		QString text = "v.2.1.0\r\n © 2020, license GPL v3\r\n"
 			       "Based on Juce library\r\n\r\n"
 			       "Authors:\r\n"
 			       "Andersama (main author) & pkv\r\n";
@@ -551,7 +552,7 @@ public:
 			std::string n = cb->getName();
 			if (n == name) {
 				if (!device) {
-					String deviceName = name.c_str();
+					String deviceName(name);
 					device = deviceType->createDevice(
 						deviceName, deviceName);
 					cb->setDevice(device, name.c_str());
@@ -852,7 +853,7 @@ bool obs_module_load(void)
 	obs_get_audio_info(&aoi);
 
 	MessageManager::getInstance();
-
+	global_thread = new TimeSliceThread("global");
 	deviceType->scanForDevices();
 	StringArray deviceNames(deviceType->getDeviceNames());
 	for (int j = 0; j < deviceNames.size(); j++) {
@@ -903,4 +904,8 @@ void obs_module_unload(void)
 	}
 	callbacks.clear();
 	delete deviceType;
+	MessageManager::deleteInstance();
+	if (!global_thread->stopThread(200))
+		blog(LOG_ERROR, "win-asio: Thread had to be force-stopped");
+	delete global_thread;
 }
