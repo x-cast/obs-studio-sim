@@ -56,6 +56,8 @@ pulseaudio_channels_to_obs_speakers(uint_fast32_t channels)
 		return SPEAKERS_12POINT0;
 	case 16:
 		return SPEAKERS_HEXADECAGONAL;
+	case 24:
+		return SPEAKERS_NHK;
 	default:
 		return SPEAKERS_UNKNOWN;
 	}
@@ -98,6 +100,15 @@ static pa_channel_map pulseaudio_channel_map(enum speaker_layout layout)
 	ret.map[13] = PA_CHANNEL_POSITION_AUX5;
 	ret.map[14] = PA_CHANNEL_POSITION_AUX6;
 	ret.map[15] = PA_CHANNEL_POSITION_AUX7;
+	ret.map[16] = PA_CHANNEL_POSITION_AUX8;
+	ret.map[17] = PA_CHANNEL_POSITION_AUX9;
+	ret.map[18] = PA_CHANNEL_POSITION_AUX10;
+	ret.map[19] = PA_CHANNEL_POSITION_AUX11;
+	ret.map[20] = PA_CHANNEL_POSITION_AUX12;
+	ret.map[21] = PA_CHANNEL_POSITION_AUX13;
+	ret.map[22] = PA_CHANNEL_POSITION_AUX14;
+	ret.map[23] = PA_CHANNEL_POSITION_AUX15;
+
 
 	switch (layout) {
 	case SPEAKERS_MONO:
@@ -230,7 +241,35 @@ static pa_channel_map pulseaudio_channel_map(enum speaker_layout layout)
 		ret.map[7] = PA_CHANNEL_POSITION_REAR_CENTER;
 		ret.map[8] = PA_CHANNEL_POSITION_AUX0;
 		break;
-
+// speakers order try to conform as much to aac spec ISO/IEC 14496-3:2009/Amd.4:2013
+	case SPEAKERS_NHK:
+		ret.channels = 24;
+		ret.map[0] = PA_CHANNEL_POSITION_FRONT_CENTER;
+		ret.map[1] = PA_CHANNEL_POSITION_FRONT_LEFT_OF_CENTER;
+		ret.map[2] = PA_CHANNEL_POSITION_FRONT_RIGHT_OF_CENTER;
+		ret.map[3] = PA_CHANNEL_POSITION_FRONT_LEFT;
+		ret.map[4] = PA_CHANNEL_POSITION_FRONT_RIGHT
+		ret.map[5] = PA_CHANNEL_POSITION_SIDE_LEFT;
+		ret.map[6] = PA_CHANNEL_POSITION_SIDE_RIGHT;
+		ret.map[7] = PA_CHANNEL_POSITION_REAR_LEFT;
+		ret.map[8] = PA_CHANNEL_POSITION_REAR_RIGHT;
+		ret.map[9] = PA_CHANNEL_POSITION_REAR_CENTER ;
+		ret.map[10] = PA_CHANNEL_POSITION_LFE;
+		ret.map[11] = PA_CHANNEL_POSITION_AUX31;
+		ret.map[12] = PA_CHANNEL_POSITION_TOP_FRONT_CENTER;
+		ret.map[13] = PA_CHANNEL_POSITION_TOP_FRONT_LEFT;
+		ret.map[14] = PA_CHANNEL_POSITION_TOP_FRONT_RIGHT;
+		ret.map[15] = PA_CHANNEL_POSITION_AUX1;
+		ret.map[16] = PA_CHANNEL_POSITION_AUX2;
+		ret.map[17] = PA_CHANNEL_POSITION_TOP_CENTER;
+		ret.map[18] = PA_CHANNEL_POSITION_TOP_REAR_LEFT;
+		ret.map[19] = PA_CHANNEL_POSITION_TOP_REAR_RIGHT ;
+		ret.map[20] = PA_CHANNEL_POSITION_TOP_REAR_CENTER;
+		ret.map[21] = PA_CHANNEL_POSITION_AUX3;
+		ret.map[22] = PA_CHANNEL_POSITION_AUX4;
+		ret.map[23] = PA_CHANNEL_POSITION_AUX5;
+		break;
+		
 	case SPEAKERS_UNKNOWN:
 	default:
 		ret.channels = 0;

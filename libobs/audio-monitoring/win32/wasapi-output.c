@@ -188,6 +188,8 @@ static enum speaker_layout convert_speaker_layout(DWORD layout, WORD channels)
 		return SPEAKERS_15POINT0;
 	case KSAUDIO_SPEAKER_HEXADECAGONAL:
 		return SPEAKERS_HEXADECAGONAL;
+	case KSAUDIO_SPEAKER_NHK:
+		return SPEAKERS_NHK;
 	}
 
 	return (enum speaker_layout)channels;

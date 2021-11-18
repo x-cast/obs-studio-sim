@@ -74,6 +74,8 @@ static void GetWASAPIDefaults(obs_data_t *settings);
 	 SPEAKER_TOP_BACK_RIGHT | SPEAKER_TOP_BACK_CENTER |         \
 	 SPEAKER_TOP_FRONT_LEFT | SPEAKER_TOP_FRONT_RIGHT |         \
 	 SPEAKER_TOP_FRONT_CENTER)
+// the windows API can't define 22.2; there's not enough speakers; so use this instead ...
+#define KSAUDIO_SPEAKER_NHK SPEAKER_RESERVED
 
 typedef HRESULT(STDAPICALLTYPE *PFN_RtwqUnlockWorkQueue)(DWORD);
 typedef HRESULT(STDAPICALLTYPE *PFN_RtwqLockSharedWorkQueue)(PCWSTR usageClass,
@@ -683,6 +685,8 @@ static speaker_layout ConvertSpeakerLayout(DWORD layout, WORD channels)
 		return SPEAKERS_15POINT0;
 	case KSAUDIO_SPEAKER_HEXADECAGONAL:
 		return SPEAKERS_HEXADECAGONAL;
+	case KSAUDIO_SPEAKER_NHK:
+		return SPEAKERS_NHK;
 	}
 
 	return (speaker_layout)channels;

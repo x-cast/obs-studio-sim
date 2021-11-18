@@ -1754,8 +1754,8 @@ static inline bool IsSurround(const char *speakers)
 {
 	static const char *surroundLayouts[] = {
 		"2.1",  "3.0",  "4.0",  "quad", "3.1",  "5.0",  "4.1",  "5.1",
-		"6.0",  "6.1",  "7.0",  "7.1",  "8.0",  "9.0",  "10.0", "11.0",
-		"12.0", "13.0", "14.0", "15.0", "16.0", nullptr};
+		"6.0",  "6.1",  "7.0",  "7.1",  "8.0",  "9.0",  "10.0", "11.0",    "12.0", "13.0",
+		"14.0", "15.0", "16.0", "22.2", nullptr};
 
 	if (!speakers || !*speakers)
 		return false;
@@ -2575,6 +2575,8 @@ void OBSBasicSettings::LoadAudioSettings()
 		ui->channelSetup->setCurrentIndex(21);
 	else if (strcmp(speakers, "16.0") == 0)
 		ui->channelSetup->setCurrentIndex(22);
+	else if (strcmp(speakers, "22.2") == 0)
+		ui->channelSetup->setCurrentIndex(23);
 	else
 		ui->channelSetup->setCurrentIndex(1);
 
@@ -3832,6 +3834,9 @@ void OBSBasicSettings::SaveAudioSettings()
 		break;
 	case 22:
 		channelSetup = "16.0";
+		break;
+	case 23:
+		channelSetup = "22.2";
 		break;
 	default:
 		channelSetup = "Stereo";

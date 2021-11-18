@@ -74,7 +74,7 @@ static void build_flv_meta_data(obs_output_t *context, uint8_t **output,
 	enc_str(&enc, end, "onMetaData");
 
 	*enc++ = AMF_ECMA_ARRAY;
-	enc = AMF_EncodeInt32(enc, end, 33);
+	enc = AMF_EncodeInt32(enc, end, 35);
 
 	enc_num_val(&enc, end, "duration", 0.0);
 	enc_num_val(&enc, end, "fileSize", 0.0);
@@ -120,7 +120,7 @@ static void build_flv_meta_data(obs_output_t *context, uint8_t **output,
 	enc_bool_val(&enc, end, "14.0", audio_output_get_channels(audio) == 14);
 	enc_bool_val(&enc, end, "15.0", audio_output_get_channels(audio) == 15);
 	enc_bool_val(&enc, end, "16.0", audio_output_get_channels(audio) == 16);
-
+	enc_bool_val(&enc, end, "22.2", audio_output_get_channels(audio) == 24);
 	dstr_printf(&encoder_name, "%s (libobs version ", MODULE_NAME);
 
 #ifdef HAVE_OBSCONFIG_H

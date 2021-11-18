@@ -4826,6 +4826,8 @@ bool OBSBasic::ResetAudio()
 		ai.speakers = SPEAKERS_15POINT0;
 	else if (strcmp(channelSetupStr, "16.0") == 0)
 		ai.speakers = SPEAKERS_HEXADECAGONAL;
+	else if (strcmp(channelSetupStr, "22.2") == 0)
+		ai.speakers = SPEAKERS_NHK;
 	else
 		ai.speakers = SPEAKERS_STEREO;
 

@@ -110,6 +110,7 @@ static inline enum speaker_layout convert_speaker_layout(uint8_t channels)
 	case 14: return SPEAKERS_14POINT0;
 	case 15: return SPEAKERS_15POINT0;
 	case 16: return SPEAKERS_HEXADECAGONAL;
+	case 24: return SPEAKERS_NHK;
 	default: return SPEAKERS_UNKNOWN;
 	}
 }

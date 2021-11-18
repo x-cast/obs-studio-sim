@@ -155,6 +155,8 @@ static inline uint64_t convert_speaker_layout(enum speaker_layout layout)
 			AV_CH_TOP_BACK_LEFT | AV_CH_TOP_BACK_RIGHT);
 	case SPEAKERS_HEXADECAGONAL:
 		return AV_CH_LAYOUT_HEXADECAGONAL;
+	case SPEAKERS_NHK:
+		return AV_CH_LAYOUT_22POINT2;
 	}
 
 	/* shouldn't get here */
@@ -232,6 +234,8 @@ convert_ff_channel_layout(uint64_t channel_layout)
 		return SPEAKERS_15POINT0;
 	case AV_CH_LAYOUT_HEXADECAGONAL:
 		return SPEAKERS_HEXADECAGONAL;
+	case AV_CH_LAYOUT_22POINT2:
+		return SPEAKERS_NHK;
 	}
 	/* shouldn't get here */
 	return SPEAKERS_UNKNOWN;

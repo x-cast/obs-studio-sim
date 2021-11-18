@@ -670,6 +670,8 @@ enum speaker_layout _alsa_channels_to_obs_speakers(unsigned int channels)
 		return SPEAKERS_12POINT0;
 	case 16:
 		return SPEAKERS_HEXADECAGONAL;
+	case 24:
+		return SPEAKERS_NHK;
 	}
 
 	return SPEAKERS_UNKNOWN;

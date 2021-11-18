@@ -494,7 +494,7 @@ VolControl::VolControl(OBSSource source_, float *volume, bool *mutePtr,
 			rec->setProperty("themeID", "MacOnly");
 		}
 #endif
-		setMaximumWidth(130);
+		setMaximumWidth(150);
 	} else {
 		QHBoxLayout *volLayout = new QHBoxLayout;
 		QHBoxLayout *textLayout = new QHBoxLayout;

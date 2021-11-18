@@ -248,6 +248,8 @@ convert_ff_channel_layout(uint64_t channel_layout)
 		return SPEAKERS_15POINT0;
 	case AV_CH_LAYOUT_HEXADECAGONAL:
 		return SPEAKERS_HEXADECAGONAL;
+	case AV_CH_LAYOUT_22POINT2:
+		return SPEAKERS_NHK;
 	}
 
 	/* shouldn't get here */

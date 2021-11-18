@@ -118,26 +118,35 @@ int get_max_obs_channels()
 }
 
 static std::vector<speaker_layout> known_layouts = {
-	SPEAKERS_MONO,                        /**< Channels: MONO */
-	SPEAKERS_STEREO,                      /**< Channels: FL, FR */
-	SPEAKERS_2POINT1,                     /**< Channels: FL, FR, LFE */
-	SPEAKERS_3POINT0,   SPEAKERS_4POINT0, /**< Channels: FL, FR, FC, RC */
-	SPEAKERS_QUAD,      SPEAKERS_3POINT1,  SPEAKERS_5POINT0,
-	SPEAKERS_4POINT1, /**< Channels: FL, FR, FC, LFE, RC */
-	SPEAKERS_5POINT1, /**< Channels: FL, FR, FC, LFE, RL, RR */
-	SPEAKERS_6POINT0,   SPEAKERS_6POINT1,  SPEAKERS_7POINT0,
-	SPEAKERS_7POINT1, /**< Channels: FL, FR, FC, LFE, RL, RR, SL, SR */
-	SPEAKERS_OCTAGONAL, SPEAKERS_9POINT0,  SPEAKERS_10POINT0,
-	SPEAKERS_11POINT0,  SPEAKERS_12POINT0, SPEAKERS_13POINT0,
-	SPEAKERS_14POINT0,  SPEAKERS_15POINT0, SPEAKERS_HEXADECAGONAL,
+		SPEAKERS_MONO,    /**< Channels: MONO */
+		SPEAKERS_STEREO,  /**< Channels: FL, FR */
+		SPEAKERS_2POINT1, /**< Channels: FL, FR, LFE */
+		SPEAKERS_3POINT0,
+		SPEAKERS_4POINT0, /**< Channels: FL, FR, FC, RC */
+		SPEAKERS_QUAD,
+		SPEAKERS_3POINT1,
+		SPEAKERS_5POINT0,
+		SPEAKERS_4POINT1, /**< Channels: FL, FR, FC, LFE, RC */
+		SPEAKERS_5POINT1, /**< Channels: FL, FR, FC, LFE, RL, RR */
+		SPEAKERS_6POINT0,
+		SPEAKERS_6POINT1,
+		SPEAKERS_7POINT0,
+		SPEAKERS_7POINT1, /**< Channels: FL, FR, FC, LFE, RL, RR, SL, SR */
+		SPEAKERS_OCTAGONAL,
+		SPEAKERS_9POINT0,
+		SPEAKERS_10POINT0,
+		SPEAKERS_11POINT0,
+		SPEAKERS_12POINT0,
+		SPEAKERS_13POINT0,
+		SPEAKERS_14POINT0,
+		SPEAKERS_15POINT0,
+		SPEAKERS_HEXADECAGONAL,
+		SPEAKERS_NHK,
 };
 
-static std::vector<std::string> known_layouts_str = {
-	"Mono", "Stereo", "2.1",       "3.0",  "4.0",           "quad",
-	"3.1",  "5.0",    "4.1",       "5.1",  "6.0",           "6.1",
-	"7.0",  "7.1",    "octagonal", "9.0",  "10.0",          "11.0",
-	"12.0", "13.0",   "14.0",      "15.0", "hexadecagonal",
-};
+static std::vector<std::string> known_layouts_str = {"Mono", "Stereo", "2.1", "3.0", "4.0", "quad", "3.1", "5.0", "4.1",
+		"5.1", "6.0", "6.1", "7.0", "7.1", "octagonal", "9.0", "10.0", "11.0", "12.0", "13.0", "14.0", "15.0",
+		"hexadecagonal", "22.2"};
 
 class AudioCB : public juce::AudioIODeviceCallback {
 private:

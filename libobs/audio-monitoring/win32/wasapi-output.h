@@ -55,6 +55,8 @@
 	 SPEAKER_TOP_BACK_RIGHT | SPEAKER_TOP_BACK_CENTER |         \
 	 SPEAKER_TOP_FRONT_LEFT | SPEAKER_TOP_FRONT_RIGHT |         \
 	 SPEAKER_TOP_FRONT_CENTER)
+// the windows API can't define 22.2; there's not enough speakers; so use this instead ...
+#define KSAUDIO_SPEAKER_NHK SPEAKER_RESERVED
 
 #define safe_release(ptr)                          \
 	do {                                       \
