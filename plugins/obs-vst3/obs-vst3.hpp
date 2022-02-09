@@ -302,7 +302,7 @@ private:
 					} else {
 						clear_vst();
 					}
-					descs.clear(false);
+					descs.clear(true);
 					return;
 				} else {
 					clear_vst();
@@ -310,7 +310,7 @@ private:
 			} else {
 				clear_vst();
 			}
-			descs.clear(false);
+			descs.clear(true);
 		}
 
 		if (was_open)
@@ -504,7 +504,7 @@ public:
 		}
 
 		obs_property_set_enabled(desc_list, has_options);
-		descs.clear(false);
+		descs.clear(true);
 		return true;
 	}
 
