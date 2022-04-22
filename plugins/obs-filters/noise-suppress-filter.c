@@ -44,7 +44,9 @@ bool nvafx_loaded = false;
 #define S_METHOD "method"
 #define S_METHOD_SPEEX "speex"
 #define S_METHOD_RNN "rnnoise"
-#define S_METHOD_NVAFX "nvafx"
+#define S_METHOD_NVAFX_DENOISER "denoiser"
+#define S_METHOD_NVAFX_DEREVERB "dereverb"
+#define S_METHOD_NVAFX_DEREVERB_DENOISER "dereverb_denoiser"
 
 #define MT_ obs_module_text
 #define TEXT_SUPPRESS_LEVEL MT_("NoiseSuppress.SuppressLevel")
@@ -52,7 +54,10 @@ bool nvafx_loaded = false;
 #define TEXT_METHOD MT_("NoiseSuppress.Method")
 #define TEXT_METHOD_SPEEX MT_("NoiseSuppress.Method.Speex")
 #define TEXT_METHOD_RNN MT_("NoiseSuppress.Method.RNNoise")
-#define TEXT_METHOD_NVAFX MT_("NoiseSuppress.Method.nvafx")
+#define TEXT_METHOD_NVAFX_DENOISER MT_("NoiseSuppress.Method.Nvafx")
+#define TEXT_METHOD_NVAFX_DEREVERB MT_("NoiseSuppress.Method.Nvafx.Dereverb")
+#define TEXT_METHOD_NVAFX_DEREVERB_DENOISER \
+	MT_("NoiseSuppress.Method.Nvafx.Dereverb.Denoiser")
 
 #define MAX_PREPROC_CHANNELS 8
 
@@ -111,6 +116,7 @@ struct noise_suppress_data {
 	unsigned int num_samples_per_frame, num_channels;
 	char *model;
 	bool nvafx_initialized;
+	const char *fx;
 
 	/* Resampler */
 	audio_resampler_t *nvafx_resampler;
@@ -209,7 +215,7 @@ static void noise_suppress_destroy(void *data)
 		audio_resampler_destroy(ng->nvafx_resampler_back);
 	}
 	bfree(ng->model);
-
+	bfree(ng->fx);
 	if (ng->nvafx_enabled) {
 		if (ng->use_nvafx)
 			pthread_join(ng->nvafx_thread, NULL);
@@ -224,44 +230,36 @@ static void noise_suppress_destroy(void *data)
 	bfree(ng);
 }
 
-static void *nvafx_initialize(void *data)
+static bool *nvafx_initialize_internal(void *data)
 {
 #ifdef LIBNVAFX_ENABLED
 	struct noise_suppress_data *ng = data;
-	int err;
+	NvAFX_Status err;
 
-	if (!ng->use_nvafx || !nvafx_loaded)
-		return NULL;
-
-	pthread_mutex_lock(&ng->nvafx_mutex);
-	pthread_mutex_lock(&nvafx_initializer_mutex);
 	if (!ng->handle[0]) {
 		ng->sample_rate = NVAFX_SAMPLE_RATE;
-
 		for (size_t i = 0; i < ng->channels; i++) {
+			// Create FX
 			CUcontext old = {0}, curr = {0};
-
-			if (cuCtxGetCurrent(&old) != CUDA_SUCCESS)
+			if (cuCtxGetCurrent(&old) != CUDA_SUCCESS) {
 				goto failure;
-
-			err = NvAFX_CreateEffect(NVAFX_EFFECT_DENOISER,
-						 &ng->handle[i]);
+			}
+			err = NvAFX_CreateEffect(ng->fx, &ng->handle[i]);
 			if (err != NVAFX_STATUS_SUCCESS) {
 				do_log(LOG_ERROR,
-				       "NvAFX_CreateEffect() failed, error %i",
-				       err);
+				       "%s FX creation failed, error %i",
+				       ng->fx, err);
 				goto failure;
 			}
-			if (cuCtxGetCurrent(&curr) != CUDA_SUCCESS)
+			if (cuCtxGetCurrent(&curr) != CUDA_SUCCESS) {
 				goto failure;
-
+			}
 			if (curr != old) {
-
 				cuCtxPopCurrent(NULL);
 			}
-
+			// Set sample rate of FX
 			err = NvAFX_SetU32(ng->handle[i],
-					   NVAFX_PARAM_DENOISER_SAMPLE_RATE,
+					   NVAFX_PARAM_INPUT_SAMPLE_RATE,
 					   ng->sample_rate);
 			if (err != NVAFX_STATUS_SUCCESS) {
 				do_log(LOG_ERROR,
@@ -269,19 +267,21 @@ static void *nvafx_initialize(void *data)
 				       ng->sample_rate, err);
 				goto failure;
 			}
-			// initial setting of intensity to 1.0f
-			err = NvAFX_SetFloat(
-				ng->handle[i],
-				NVAFX_PARAM_DENOISER_INTENSITY_RATIO,
-				ng->intensity_ratio);
+
+			// Set intensity of FX
+			err = NvAFX_SetFloat(ng->handle[i],
+					     NVAFX_PARAM_INTENSITY_RATIO,
+					     ng->intensity_ratio);
 			if (err != NVAFX_STATUS_SUCCESS) {
 				do_log(LOG_ERROR,
 				       "NvAFX_SetFloat(Intensity Ratio: %f) failed, error %i",
-				       1.0f, err);
+				       ng->intensity_ratio, err);
 				goto failure;
 			}
+
+			// Set AI models path
 			err = NvAFX_SetString(ng->handle[i],
-					      NVAFX_PARAM_DENOISER_MODEL_PATH,
+					      NVAFX_PARAM_MODEL_PATH,
 					      ng->model);
 			if (err != NVAFX_STATUS_SUCCESS) {
 				do_log(LOG_ERROR,
@@ -289,6 +289,8 @@ static void *nvafx_initialize(void *data)
 				       err);
 				goto failure;
 			}
+
+			// Load FX
 			err = NvAFX_Load(ng->handle[i]);
 			if (err != NVAFX_STATUS_SUCCESS) {
 				do_log(LOG_ERROR,
@@ -297,39 +299,66 @@ static void *nvafx_initialize(void *data)
 				goto failure;
 			}
 		}
-		if (ng->use_nvafx) {
-			err = NvAFX_GetU32(ng->handle[0],
-					   NVAFX_PARAM_DENOISER_NUM_CHANNELS,
-					   &ng->num_channels);
-			if (err != NVAFX_STATUS_SUCCESS) {
-				do_log(LOG_ERROR,
-				       "NvAFX_GetU32() failed to get the number of channels, error %i",
-				       err);
-				goto failure;
-			}
-			if (ng->num_channels != 1) {
-				do_log(LOG_ERROR,
-				       "The number of channels is not 1 in the sdk any more ==> update code");
-				goto failure;
-			}
-			NvAFX_Status err = NvAFX_GetU32(
-				ng->handle[0],
-				NVAFX_PARAM_DENOISER_NUM_SAMPLES_PER_FRAME,
-				&ng->num_samples_per_frame);
-			if (err != NVAFX_STATUS_SUCCESS) {
-				do_log(LOG_ERROR,
-				       "NvAFX_GetU32() failed to get the number of samples per frame, error %i",
-				       err);
-				goto failure;
-			}
-			if (ng->num_samples_per_frame != NVAFX_FRAME_SIZE) {
-				do_log(LOG_ERROR,
-				       "The number of samples per frame has changed from 480 (= 10 ms) ==> update code");
-				goto failure;
-			}
+	}
+	return true;
+
+failure:
+	ng->use_nvafx = false;
+	return false;
+
+#else
+	UNUSED_PARAMETER(data);
+	return false;
+#endif
+}
+
+static void *nvafx_initialize(void *data)
+{
+#ifdef LIBNVAFX_ENABLED
+	struct noise_suppress_data *ng = data;
+	NvAFX_Status err;
+
+	if (!ng->use_nvafx || !nvafx_loaded) {
+		return NULL;
+	}
+	pthread_mutex_lock(&ng->nvafx_mutex);
+	pthread_mutex_lock(&nvafx_initializer_mutex);
+	if (!nvafx_initialize_internal(data)) {
+		goto failure;
+	}
+	if (ng->use_nvafx) {
+		err = NvAFX_GetU32(ng->handle[0],
+				   NVAFX_PARAM_DENOISER_NUM_CHANNELS,
+				   &ng->num_channels);
+		if (err != NVAFX_STATUS_SUCCESS) {
+			do_log(LOG_ERROR,
+			       "NvAFX_GetU32() failed to get the number of channels, error %i",
+			       err);
+			goto failure;
+		}
+		if (ng->num_channels != 1) {
+			do_log(LOG_ERROR,
+			       "The number of channels is not 1 in the sdk any more ==> update code");
+			goto failure;
+		}
+		NvAFX_Status err =
+			NvAFX_GetU32(ng->handle[0],
+				     NVAFX_PARAM_DENOISER_NUM_SAMPLES_PER_FRAME,
+				     &ng->num_samples_per_frame);
+		if (err != NVAFX_STATUS_SUCCESS) {
+			do_log(LOG_ERROR,
+			       "NvAFX_GetU32() failed to get the number of samples per frame, error %i",
+			       err);
+			goto failure;
+		}
+		if (ng->num_samples_per_frame != NVAFX_FRAME_SIZE) {
+			do_log(LOG_ERROR,
+			       "The number of samples per frame has changed from 480 (= 10 ms) ==> update code");
+			goto failure;
 		}
 	}
 	ng->nvafx_initialized = true;
+	ng->nvafx_loading = false;
 	pthread_mutex_unlock(&nvafx_initializer_mutex);
 	pthread_mutex_unlock(&ng->nvafx_mutex);
 	return NULL;
@@ -400,25 +429,22 @@ static void noise_suppress_update(void *data, obs_data_t *s)
 	ng->latency = 1000000000LL / (1000 / BUFFER_SIZE_MSEC);
 	ng->use_rnnoise = strcmp(method, S_METHOD_RNN) == 0;
 
-	ng->use_nvafx = ng->nvafx_enabled &&
-			strcmp(method, S_METHOD_NVAFX) == 0;
-
-	/* Process 10 millisecond segments to keep latency low */
-	/* Also RNNoise only supports buffers of this exact size. */
-	/* At 48kHz, NVAFX processes 480 samples which corresponds to 10 ms.*/
-	ng->frames = frames;
-	ng->channels = channels;
-
+	bool nvafx_requested =
+		strcmp(method, S_METHOD_NVAFX_DENOISER) == 0 ||
+		strcmp(method, S_METHOD_NVAFX_DEREVERB) == 0 ||
+		strcmp(method, S_METHOD_NVAFX_DEREVERB_DENOISER) == 0;
 #ifdef LIBNVAFX_ENABLED
-	ng->intensity_ratio = (float)obs_data_get_double(s, S_NVAFX_INTENSITY);
-	if (ng->use_nvafx) {
-		pthread_mutex_lock(&ng->nvafx_mutex);
-		if (ng->nvafx_initialized) {
-			int err;
+	float intensity = (float)obs_data_get_double(s, S_NVAFX_INTENSITY);
+	if (ng->use_nvafx && ng->nvafx_initialized) {
+		if (intensity != ng->intensity_ratio &&
+		    (strcmp(ng->fx, method) == 0)) {
+			NvAFX_Status err;
+			ng->intensity_ratio = intensity;
+			pthread_mutex_lock(&ng->nvafx_mutex);
 			for (size_t i = 0; i < ng->channels; i++) {
 				err = NvAFX_SetFloat(
 					ng->handle[i],
-					NVAFX_PARAM_DENOISER_INTENSITY_RATIO,
+					NVAFX_PARAM_INTENSITY_RATIO,
 					ng->intensity_ratio);
 				if (err != NVAFX_STATUS_SUCCESS) {
 					do_log(LOG_ERROR,
@@ -427,9 +453,40 @@ static void noise_suppress_update(void *data, obs_data_t *s)
 					ng->use_nvafx = false;
 				}
 			}
+			pthread_mutex_unlock(&ng->nvafx_mutex);
 		}
-		pthread_mutex_unlock(&ng->nvafx_mutex);
+		if ((strcmp(ng->fx, method) != 0)) {
+			ng->fx = bstrdup(method);
+			ng->intensity_ratio = intensity;
+			for (int i = 0; i < ng->channels; i++) {
+				/* Destroy previous FX */
+				pthread_mutex_lock(&ng->nvafx_mutex);
+				if (NvAFX_DestroyEffect(ng->handle[i]) !=
+				    NVAFX_STATUS_SUCCESS) {
+					do_log(LOG_ERROR,
+					       "FX failed to be destroyed.");
+					ng->use_nvafx = false;
+				} else
+					ng->handle[i] = NULL;
+				pthread_mutex_unlock(&ng->nvafx_mutex);
+				nvafx_initialize_internal(data);
+				pthread_mutex_unlock(&ng->nvafx_mutex);
+			}
+		}
+	} else {
+		ng->fx = bstrdup(method);
 	}
+#endif
+	ng->use_nvafx = ng->nvafx_enabled && nvafx_requested;
+
+	/* Process 10 millisecond segments to keep latency low */
+	/* Also RNNoise only supports buffers of this exact size. */
+	/* At 48kHz, NVAFX processes 480 samples which corresponds to 10 ms.*/
+	ng->frames = frames;
+	ng->channels = channels;
+
+#ifdef LIBNVAFX_ENABLED
+
 #endif
 	/* Ignore if already allocated */
 #if defined(LIBSPEEXDSP_ENABLED)
@@ -606,7 +663,7 @@ bool load_nvafx(void)
 			     "[noise suppress]: NVIDIA RTX AUDIO FX disabled: unsupported GPU");
 		} else {
 			blog(LOG_ERROR,
-			     "[noise suppress]: NVIDIA RTX AUDIO FX disabled: error %i",
+			     "[noise suppress]: NVIDIA RTX AUDIO FX disabled, error %i",
 			     err);
 		}
 		goto unload_everything;
@@ -673,6 +730,7 @@ static void *noise_suppress_create(obs_data_t *settings, obs_source_t *filter)
 		ng->nvafx_enabled = true;
 		ng->nvafx_initialized = false;
 		ng->nvafx_loading = false;
+		ng->fx = "";
 
 		pthread_mutex_init(&ng->nvafx_mutex, NULL);
 
@@ -840,9 +898,14 @@ static inline void process_nvafx(struct noise_suppress_data *ng)
 				ng->handle[i], &ng->nvafx_segment_buffers[i],
 				&ng->nvafx_segment_buffers[i],
 				ng->num_samples_per_frame, ng->num_channels);
-			if (err != NVAFX_STATUS_SUCCESS)
+			if (err != NVAFX_STATUS_SUCCESS) {
 				do_log(LOG_ERROR,
-				       "NvAFX_Run() failed, error %i", err);
+				       "NvAFX_Run() failed, error %i.\n"
+				       "This can occur when changing the FX and is not consequential.",
+				       err);
+				ng->use_nvafx =
+					false; // stop all processing; this will be reset at new init
+			}
 		}
 
 		/* Revert signal level adjustment, resample back if necessary */
@@ -1010,10 +1073,13 @@ static bool noise_suppress_method_modified(obs_properties_t *props,
 		obs_properties_get(props, S_SUPPRESS_LEVEL);
 	obs_property_t *p_navfx_intensity =
 		obs_properties_get(props, S_NVAFX_INTENSITY);
+
 	const char *method = obs_data_get_string(settings, S_METHOD);
 	bool enable_level = strcmp(method, S_METHOD_SPEEX) == 0;
-	bool enable_intensity = strcmp(method, S_METHOD_NVAFX) == 0;
-
+	bool enable_intensity =
+		strcmp(method, S_METHOD_NVAFX_DENOISER) == 0 ||
+		strcmp(method, S_METHOD_NVAFX_DEREVERB) == 0 ||
+		strcmp(method, S_METHOD_NVAFX_DEREVERB_DENOISER) == 0;
 	obs_property_set_visible(p_suppress_level, enable_level);
 	obs_property_set_visible(p_navfx_intensity, enable_intensity);
 
@@ -1063,9 +1129,16 @@ static obs_properties_t *noise_suppress_properties(void *data)
 	obs_property_list_add_string(method, TEXT_METHOD_SPEEX, S_METHOD_SPEEX);
 	obs_property_list_add_string(method, TEXT_METHOD_RNN, S_METHOD_RNN);
 #ifdef LIBNVAFX_ENABLED
-	if (ng->nvafx_enabled)
-		obs_property_list_add_string(method, TEXT_METHOD_NVAFX,
-					     S_METHOD_NVAFX);
+	if (ng->nvafx_enabled) {
+		obs_property_list_add_string(method, TEXT_METHOD_NVAFX_DENOISER,
+					     S_METHOD_NVAFX_DENOISER);
+		obs_property_list_add_string(method, TEXT_METHOD_NVAFX_DEREVERB,
+					     S_METHOD_NVAFX_DEREVERB);
+		obs_property_list_add_string(
+			method, TEXT_METHOD_NVAFX_DEREVERB_DENOISER,
+			S_METHOD_NVAFX_DEREVERB_DENOISER);
+	}
+
 #endif
 	obs_property_set_modified_callback(method,
 					   noise_suppress_method_modified);
