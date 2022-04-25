@@ -104,7 +104,7 @@ struct ffmpeg_output {
 	os_sem_t *write_sem;
 	os_event_t *stop_event;
 
-	DARRAY(AVPacket) packets;
+	DARRAY(AVPacket *) packets;
 #ifdef NEW_MPEGTS_OUTPUT
 	/* used for srt & rist */
 	URLContext *h;

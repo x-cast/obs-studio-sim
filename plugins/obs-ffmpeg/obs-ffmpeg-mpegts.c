@@ -755,7 +755,7 @@ static uint64_t get_packet_sys_dts(struct ffmpeg_output *output,
 
 static int mpegts_process_packet(struct ffmpeg_output *output)
 {
-	AVPacket packet;
+	AVPacket *packet = NULL;
 	bool new_packet = false;
 	int ret;
 
@@ -773,7 +773,7 @@ static int mpegts_process_packet(struct ffmpeg_output *output)
 	//blog(LOG_DEBUG,
 	//     "size = %d, flags = %lX, stream = %d, "
 	//     "packets queued: %lu",
-	//     packet.size, packet.flags, packet.stream_index,
+	//     packet->size, packet->flags, packet->stream_index,
 	//     output->packets.num);
 
 	if (stopping(output)) {
@@ -781,10 +781,10 @@ static int mpegts_process_packet(struct ffmpeg_output *output)
 		if (sys_ts >= output->stop_ts)
 			return 0;
 	}
-	output->total_bytes += packet.size;
-	ret = av_interleaved_write_frame(output->ff_data.output, &packet);
+	output->total_bytes += packet->size;
+	ret = av_interleaved_write_frame(output->ff_data.output, packet);
 	if (ret < 0) {
-		av_free_packet(&packet);
+		av_packet_free(&packet);
 		ffmpeg_mpegts_log_error(
 			LOG_WARNING, &output->ff_data,
 			"process_packet: Error writing packet: %s",
@@ -1035,7 +1035,7 @@ static void ffmpeg_mpegts_deactivate(struct ffmpeg_output *output)
 	pthread_mutex_lock(&output->write_mutex);
 
 	for (size_t i = 0; i < output->packets.num; i++)
-		av_free_packet(output->packets.array + i);
+		av_packet_free(output->packets.array + i);
 	da_free(output->packets);
 
 	pthread_mutex_unlock(&output->write_mutex);
@@ -1073,32 +1073,35 @@ void mpegts_write_packet(struct ffmpeg_output *stream,
 		is_video ? stream->ff_data.video
 			 : stream->ff_data.audio_infos[encpacket->track_idx]
 				   .stream;
-	AVPacket packet = {0};
+	AVPacket *packet = NULL;
 
 	const AVRational codec_time_base =
 		is_video ? stream->ff_data.video_ctx->time_base
 			 : stream->ff_data.audio_infos[encpacket->track_idx]
 				   .ctx->time_base;
 
-	av_init_packet(&packet);
+	packet = av_packet_alloc();
 
-	packet.data = av_memdup(encpacket->data, (int)encpacket->size);
-	if (packet.data == NULL) {
+	packet->data = av_memdup(encpacket->data, (int)encpacket->size);
+	if (packet->data == NULL) {
 		error("couldn't allocate packet data");
-		return;
+		goto fail;
 	}
-	packet.size = (int)encpacket->size;
-	packet.stream_index = avstream->id;
-	packet.pts = rescale_ts2(avstream, codec_time_base, encpacket->pts);
-	packet.dts = rescale_ts2(avstream, codec_time_base, encpacket->dts);
+	packet->size = (int)encpacket->size;
+	packet->stream_index = avstream->id;
+	packet->pts = rescale_ts2(avstream, codec_time_base, encpacket->pts);
+	packet->dts = rescale_ts2(avstream, codec_time_base, encpacket->dts);
 
 	if (encpacket->keyframe)
-		packet.flags = AV_PKT_FLAG_KEY;
+		packet->flags = AV_PKT_FLAG_KEY;
 
 	pthread_mutex_lock(&stream->write_mutex);
 	da_push_back(stream->packets, &packet);
 	pthread_mutex_unlock(&stream->write_mutex);
 	os_sem_post(stream->write_sem);
+	return;
+fail:
+	av_packet_free(&packet);
 }
 
 static bool get_extradata(struct ffmpeg_output *stream)
