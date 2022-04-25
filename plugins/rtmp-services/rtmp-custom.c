@@ -115,14 +115,14 @@ static const char *rtmp_custom_password(void *data)
 static void rtmp_custom_apply_settings(void *data, obs_data_t *video_settings,
 				       obs_data_t *audio_settings)
 {
-	UNUSED_PARAMETER(audio_settings);
-
 	struct rtmp_custom *service = data;
-	if (service->server != NULL && video_settings != NULL &&
+	if (service->server != NULL &&
 	    strncmp(service->server, RTMP_PROTOCOL, strlen(RTMP_PROTOCOL)) !=
 		    0) {
-		obs_data_set_bool(video_settings, "repeat_headers", true);
-		obs_data_set_bool(audio_settings, "set_to_ADTS", true);
+		if (video_settings != NULL)
+			obs_data_set_bool(video_settings, "repeat_headers", true);
+		if (audio_settings != NULL)
+			obs_data_set_bool(audio_settings, "set_to_ADTS", true);
 	}
 }
 
