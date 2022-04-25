@@ -28,6 +28,7 @@
 #include "obs-ffmpeg-rist.h"
 #include "obs-ffmpeg-srt.h"
 #include <libavutil/channel_layout.h>
+#include <libavutil/mastering_display_metadata.h>
 
 /* ------------------------------------------------------------------------- */
 #define do_log(level, format, ...)                             \
@@ -152,7 +153,28 @@ static bool create_video_stream(struct ffmpeg_output *stream,
 	}
 	if (!new_stream(data, &data->video, name))
 		return false;
-
+	if ((data->config.color_trc == AVCOL_TRC_SMPTE2084) ||
+	    (data->config.color_trc == AVCOL_TRC_ARIB_STD_B67)) {
+		AVMasteringDisplayMetadata *const mastering =
+			av_mastering_display_metadata_alloc();
+		mastering->display_primaries[0][0] = av_make_q(17, 25);
+		mastering->display_primaries[0][1] = av_make_q(8, 25);
+		mastering->display_primaries[1][0] = av_make_q(53, 200);
+		mastering->display_primaries[1][1] = av_make_q(69, 100);
+		mastering->display_primaries[2][0] = av_make_q(3, 20);
+		mastering->display_primaries[2][1] = av_make_q(3, 50);
+		mastering->white_point[0] = av_make_q(3127, 10000);
+		mastering->white_point[1] = av_make_q(329, 1000);
+		mastering->min_luminance = av_make_q(0, 1);
+		mastering->max_luminance = av_make_q(
+			(int)obs_get_video_hdr_nominal_peak_level(), 1);
+		mastering->has_primaries = 1;
+		mastering->has_luminance = 1;
+		av_stream_add_side_data(data->video,
+					AV_PKT_DATA_MASTERING_DISPLAY_METADATA,
+					(uint8_t *)mastering,
+					sizeof(*mastering));
+	}
 	context = avcodec_alloc_context3(NULL);
 	context->codec_type = codec->type;
 	context->codec_id = codec->id;
@@ -856,28 +878,34 @@ static bool set_config(struct ffmpeg_output *stream)
 	const struct video_output_info *voi = video_output_get_info(video);
 	config.color_range = voi->range == VIDEO_RANGE_FULL ? AVCOL_RANGE_JPEG
 							    : AVCOL_RANGE_MPEG;
+	config.colorspace = format_is_yuv(voi->format) ? AVCOL_SPC_BT709
+						       : AVCOL_SPC_RGB;
 	switch (voi->colorspace) {
 	case VIDEO_CS_601:
 		config.color_primaries = AVCOL_PRI_SMPTE170M;
 		config.color_trc = AVCOL_TRC_SMPTE170M;
+		config.colorspace = AVCOL_SPC_SMPTE170M;
 		break;
 	case VIDEO_CS_DEFAULT:
 	case VIDEO_CS_709:
 		config.color_primaries = AVCOL_PRI_BT709;
 		config.color_trc = AVCOL_TRC_BT709;
+		config.colorspace = AVCOL_SPC_BT709;
 		break;
 	case VIDEO_CS_SRGB:
 		config.color_primaries = AVCOL_PRI_BT709;
 		config.color_trc = AVCOL_TRC_IEC61966_2_1;
+		config.colorspace = AVCOL_SPC_BT709;
 		break;
-	}
-
-	if (format_is_yuv(voi->format)) {
-		config.colorspace = (voi->colorspace == VIDEO_CS_601)
-					    ? AVCOL_SPC_SMPTE170M
-					    : AVCOL_SPC_BT709;
-	} else {
-		config.colorspace = AVCOL_SPC_RGB;
+	case VIDEO_CS_2100_PQ:
+		config.color_primaries = AVCOL_PRI_BT2020;
+		config.color_trc = AVCOL_TRC_SMPTE2084;
+		config.colorspace = AVCOL_SPC_BT2020_NCL;
+		break;
+	case VIDEO_CS_2100_HLG:
+		config.color_primaries = AVCOL_PRI_BT2020;
+		config.color_trc = AVCOL_TRC_ARIB_STD_B67;
+		config.colorspace = AVCOL_SPC_BT2020_NCL;
 	}
 
 	// 2.c) set width & height
