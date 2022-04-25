@@ -1,44 +1,40 @@
 project(win-asio)
 
-set(CMAKE_PREFIX_PATH "${QTDIR}")
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
+add_library(win-asio MODULE)
+add_library(OBS::asio ALIAS win-asio)
+target_sources(win-asio PRIVATE asio-input.cpp)
+target_sources(win-asio PRIVATE asio-input.qrc)
 
-include_directories(
-	${CMAKE_SOURCE_DIR}/UI/obs-frontend-api
-	${JUCE_INCLUDE_DIR}
-	${JUCE_INCLUDE_DIR}/modules
-)
-set(juce-sdk_HEADERS
-	)
-set(juce-sdk_SOURCES
-	)
+if(NOT QT_VERSION)
+  set(QT_VERSION
+      "5"
+      CACHE STRING "OBS Qt version [5, 6]" FORCE)
+  set_property(CACHE QT_VERSION PROPERTY STRINGS 5 6)
+endif()
 
-set(win-asio_HEADERS
-	)
+find_qt(
+  VERSION ${QT_VERSION}
+  COMPONENTS Widgets Core)
 
-set(win-asio_SOURCES
-	asio-input.cpp
-	)
+set_target_properties(
+  win-asio
+  PROPERTIES AUTOMOC ON
+             AUTOUIC ON)
+
 set(JUCE_LIB optimized ${JUCE_LIBRARY} debug ${JUCE_LIBRARY_DEBUG})
-set(win-asio_QRC
-	asio-input.qrc
-	)
 
-qt5_add_resources(win-asio_QRC_SOURCES ${win-asio_QRC})
+target_include_directories(win-asio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+                                       ${CMAKE_CURRENT_BINARY_DIR}
+                                       ${CMAKE_SOURCE_DIR}/UI/obs-frontend-api
+                                       ${JUCE_INCLUDE_DIR}
+                                       ${JUCE_INCLUDE_DIR}/modules)
 
-add_library(win-asio MODULE
-	${win-asio_SOURCES}
-	${win-asio_QRC_SOURCES}
-)
-
-target_link_libraries(win-asio
-	libobs
-	obs-frontend-api
+target_link_libraries(win-asio PRIVATE
+	OBS::libobs
+	OBS::frontend-api
 	Qt5::Core
 	Qt5::Widgets
 	${JUCE_LIB}
 )
 
-install_obs_plugin_with_data(win-asio data)
+setup_plugin_target(win-asio)
