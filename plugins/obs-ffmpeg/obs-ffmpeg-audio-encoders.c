@@ -236,6 +236,11 @@ static void *enc_create(obs_data_t *settings, obs_encoder_t *encoder,
 	aoi = audio_output_get_info(audio);
 	enc->context->channels = (int)audio_output_get_channels(audio);
 	enc->context->channel_layout = convert_speaker_layout(aoi->speakers);
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 24, 100)
+	av_channel_layout_default(&enc->context->ch_layout, enc->context->channels);
+	if (aoi->speakers == SPEAKERS_4POINT1)
+		enc->context->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_4POINT1;
+#endif
 	enc->context->sample_rate = audio_output_get_sample_rate(audio);
 	enc->context->sample_fmt = enc->codec->sample_fmts
 					   ? enc->codec->sample_fmts[0]
@@ -315,7 +320,9 @@ static bool do_encode(struct enc_encoder *enc, struct encoder_packet *packet,
 		warn("avcodec_fill_audio_frame failed: %s", av_err2str(ret));
 		return false;
 	}
-
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 24, 100)
+	enc->aframe->ch_layout = enc->context->ch_layout;
+#endif
 	enc->total_samples += enc->frame_size;
 
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(57, 40, 101)
