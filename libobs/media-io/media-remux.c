@@ -22,7 +22,7 @@
 #include "../util/platform.h"
 
 #include <libavformat/avformat.h>
-
+#include <libavcodec/version.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -84,7 +84,7 @@ static inline bool init_output(media_remux_job_t job, const char *out_filename)
 
 	for (unsigned i = 0; i < job->ifmt_ctx->nb_streams; i++) {
 		AVStream *in_stream = job->ifmt_ctx->streams[i];
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 48, 101)
+#if (LIBAVCODEC_VERSION_INT) >= AV_VERSION_INT(57, 48, 101)
 		AVStream *out_stream = avformat_new_stream(job->ofmt_ctx, NULL);
 #else
 		AVStream *out_stream = avformat_new_stream(
