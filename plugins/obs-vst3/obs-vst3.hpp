@@ -13,8 +13,9 @@
 #include <QDesktopWidget>
 #include <QCursor>
 #include <JuceHeader.h>
-//#include <juce_audio_devices/midi_io/juce_MidiDevices.h>
-//#include <juce_audio_processors/juce_audio_processors.h>
+
+// global var to count the number of instances
+uint count = 0;
 
 int get_max_obs_channels()
 {
@@ -311,6 +312,7 @@ private:
 				clear_vst();
 			}
 			descs.clear(true);
+			descs.~OwnedArray();
 		}
 
 		if (was_open)
@@ -388,7 +390,9 @@ public:
 		if (editor)
 			delete editor;
 		close_vst(vst_instance);
+		vst_instance = nullptr;
 		close_vst(new_vst_instance);
+		new_vst_instance = nullptr;
 	}
 
 	void host_clicked(AudioPluginInstance *inst = nullptr)
@@ -505,18 +509,7 @@ public:
 
 		obs_property_set_enabled(desc_list, has_options);
 		descs.clear(true);
-		return true;
-	}
-
-	static bool midi_selected_modified(
-			void *vptr, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
-	{
-		obs_property_list_clear(property);
-		juce::StringArray devices = MidiInput::getDevices();
-		obs_property_list_add_string(property, "", "");
-		for (int i = 0; i < devices.size(); i++)
-			obs_property_list_add_string(property, devices[i].toRawUTF8(), devices[i].toRawUTF8());
-
+		descs.~OwnedArray();
 		return true;
 	}
 
@@ -531,7 +524,6 @@ public:
 
 		obs_property_t *vst_list;
 		obs_property_t *desc_list;
-		obs_property_t *midi_list;
 
 		obs_property_t *vst_host_button;
 		obs_property_t *dpi_aware;
@@ -542,10 +534,6 @@ public:
 
 		desc_list = obs_properties_add_list(props, "desc", obs_module_text("Plugin Description"),
 				OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
-
-		midi_list = obs_properties_add_list(
-				props, "midi", obs_module_text("Midi"), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
-		obs_property_set_modified_callback2(midi_list, midi_selected_modified, nullptr);
 
 		vst_host_button = obs_properties_add_button2(props, "vst_button", "Show", vst_host_clicked, plugin);
 
@@ -602,6 +590,8 @@ public:
 			plugin->incReferenceCount();
 			plugin->update(settings);
 		}
+		count++;
+		MessageManager::getInstance();
 		return plugin;
 	}
 
@@ -614,9 +604,13 @@ public:
 
 	static void Destroy(void *vptr)
 	{
+		MessageManager::getInstance()->MessageManager::setCurrentThreadAsMessageThread();
 		PluginHost *plugin = static_cast<PluginHost *>(vptr);
 		if (plugin)
 			plugin->decReferenceCount();
+		count--;
+		if (count == 0)
+			MessageManager::deleteInstance();
 	}
 
 	static struct obs_audio_data *Filter_Audio(void *vptr, struct obs_audio_data *audio)
