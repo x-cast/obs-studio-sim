@@ -740,78 +740,83 @@ static inline bool mp_media_thread(mp_media_t *m)
 		return false;
 	}
 
-	for (;;) {
-		bool reset, kill, is_active, seek, pause, reset_time;
-		int64_t seek_pos;
-		bool timeout = false;
+	if (m) {
+		for (;;) {
+			bool reset, kill, is_active, seek, pause, reset_time;
+			int64_t seek_pos;
+			bool timeout = false;
 
-		pthread_mutex_lock(&m->mutex);
-		is_active = m->active;
-		pause = m->pause;
-		pthread_mutex_unlock(&m->mutex);
+			pthread_mutex_lock(&m->mutex);
+			is_active = m->active;
+			pause = m->pause;
+			pthread_mutex_unlock(&m->mutex);
 
-		if (!is_active || pause) {
-			if (os_sem_wait(m->sem) < 0)
-				return false;
-			if (pause)
+			if (!is_active || pause) {
+				if (os_sem_wait(m->sem) < 0)
+					return false;
+				if (pause)
+					reset_ts(m);
+			} else {
+				timeout = mp_media_sleep(m);
+			}
+
+			pthread_mutex_lock(&m->mutex);
+
+			reset = m->reset;
+			kill = m->kill;
+			m->reset = false;
+			m->kill = false;
+
+			pause = m->pause;
+			seek_pos = m->seek_pos;
+			seek = m->seek;
+			reset_time = m->reset_ts;
+			m->seek = false;
+			m->reset_ts = false;
+
+			pthread_mutex_unlock(&m->mutex);
+
+			if (kill) {
+				break;
+			}
+			if (reset) {
+				mp_media_reset(m);
+				continue;
+			}
+
+			if (seek) {
+				m->seek_next_ts = true;
+				seek_to(m, seek_pos);
+				continue;
+			}
+
+			if (reset_time) {
 				reset_ts(m);
-		} else {
-			timeout = mp_media_sleep(m);
-		}
+				continue;
+			}
 
-		pthread_mutex_lock(&m->mutex);
-
-		reset = m->reset;
-		kill = m->kill;
-		m->reset = false;
-		m->kill = false;
-
-		pause = m->pause;
-		seek_pos = m->seek_pos;
-		seek = m->seek;
-		reset_time = m->reset_ts;
-		m->seek = false;
-		m->reset_ts = false;
-
-		pthread_mutex_unlock(&m->mutex);
-
-		if (kill) {
-			break;
-		}
-		if (reset) {
-			mp_media_reset(m);
-			continue;
-		}
-
-		if (seek) {
-			m->seek_next_ts = true;
-			seek_to(m, seek_pos);
-			continue;
-		}
-
-		if (reset_time) {
-			reset_ts(m);
-			continue;
-		}
-
-		if (pause)
-			continue;
-
-		/* frames are ready */
-		if (is_active && !timeout) {
-			if (m->has_video)
-				mp_media_next_video(m, false);
-			if (m->has_audio)
-				mp_media_next_audio(m);
-
-			if (!mp_media_prepare_frames(m))
-				return false;
-			if (mp_media_eof(m))
+			if (pause)
 				continue;
 
-			mp_media_calc_next_ns(m);
+			/* frames are ready */
+			if (is_active && !timeout) {
+				if (m->has_video)
+					mp_media_next_video(m, false);
+				if (m->has_audio)
+					mp_media_next_audio(m);
+
+				if (!mp_media_prepare_frames(m))
+					return false;
+				if (mp_media_eof(m))
+					continue;
+
+				mp_media_calc_next_ns(m);
+			}
 		}
+
+
 	}
+
 
 	return true;
 }
