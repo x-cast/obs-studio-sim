@@ -569,6 +569,7 @@ VolControl::VolControl(OBSSource source_, float *volume, bool *mutePtr,
 	/* mute button */
 	bool muted = obs_source_muted(source);
 	mute->setChecked(muted);
+	volMeter->muted = muted;
 	SetMuted(muted);
 	mute->setAccessibleName(QTStr("VolControl.Mute").arg(sourceName));
 	obs_fader_add_callback(obs_fader, OBSVolumeChanged, this);
