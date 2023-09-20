@@ -4,6 +4,7 @@
 
 #include <string>
 #include <sstream>
+#include <random>
 
 static std::string trim_string(const std::string &source)
 {
@@ -87,7 +88,7 @@ enum webrtc_network_status : int {
 	DeleteFailed = 7,
 };
 
-webrtc_network_status
+static inline webrtc_network_status
 send_offer(std::string bearer_token, std::string endpoint_url,
 	   std::shared_ptr<rtc::PeerConnection> peer_connection,
 	   std::string &resource_url)
@@ -141,7 +142,7 @@ send_offer(std::string bearer_token, std::string endpoint_url,
 	curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &response_code);
 	if (response_code != 201) {
 		cleanup();
-		return webrtc_network_status::ConnectFailed;
+		return webrtc_network_status::InvalidHTTPStatusCode;
 	}
 
 	if (read_buffer.empty()) {
@@ -197,11 +198,12 @@ send_offer(std::string bearer_token, std::string endpoint_url,
 	rtc::Description answer(response, "answer");
 	peer_connection->setRemoteDescription(answer);
 	cleanup();
+
 	return webrtc_network_status::Success;
 }
 
-webrtc_network_status send_delete(std::string bearer_token,
-				  std::string resource_url)
+static inline webrtc_network_status send_delete(std::string bearer_token,
+						std::string resource_url)
 {
 	const std::string user_agent = generate_user_agent();
 
@@ -243,3 +245,10 @@ webrtc_network_status send_delete(std::string bearer_token,
 	return webrtc_network_status::Success;
 }
 
+static uint32_t generate_random_u32()
+{
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<uint32_t> dist(1, (UINT32_MAX - 1));
+	return dist(gen);
+}

@@ -103,6 +103,9 @@ struct mp_media {
 	bool seek;
 	bool seek_next_ts;
 	int64_t seek_pos;
+
+	AVIOContext *av_io_context_open;
+	AVIOContext *av_io_context_playback;
 };
 
 typedef struct mp_media mp_media_t;

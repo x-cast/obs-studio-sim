@@ -5,14 +5,6 @@
 	blog(level, "[obs-webrtc] [whip_output: '%s'] " format, \
 	     obs_output_get_name(output), ##__VA_ARGS__)
 
-static uint32_t generate_random_u32()
-{
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<uint32_t> dist(1, (UINT32_MAX - 1));
-	return dist(gen);
-}
-
 /*
  * Sets the maximum size for a video fragment. Effective range is
  * 576-1470, with a lower value equating to more packets created,
