@@ -1,5 +1,17 @@
 #include "whip-output.h"
-#include "whip-utils.h"
+#include "webrtc-utils.h"
+
+#define do_log(level, format, ...)                              \
+	blog(level, "[obs-webrtc] [whip_output: '%s'] " format, \
+	     obs_output_get_name(output), ##__VA_ARGS__)
+
+static uint32_t generate_random_u32()
+{
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<uint32_t> dist(1, (UINT32_MAX - 1));
+	return dist(gen);
+}
 
 /*
  * Sets the maximum size for a video fragment. Effective range is
@@ -12,8 +24,6 @@ const int signaling_media_id_length = 16;
 const char signaling_media_id_valid_char[] = "0123456789"
 					     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 					     "abcdefghijklmnopqrstuvwxyz";
-
-const std::string user_agent = generate_user_agent();
 
 const char *audio_mid = "0";
 const uint8_t audio_payload_type = 111;
@@ -253,142 +263,6 @@ bool WHIPOutput::Setup()
 	return true;
 }
 
-bool WHIPOutput::Connect()
-{
-	struct curl_slist *headers = NULL;
-	headers = curl_slist_append(headers, "Content-Type: application/sdp");
-	if (!bearer_token.empty()) {
-		auto bearer_token_header =
-			std::string("Authorization: Bearer ") + bearer_token;
-		headers =
-			curl_slist_append(headers, bearer_token_header.c_str());
-	}
-
-	std::string read_buffer;
-	std::vector<std::string> location_headers;
-
-	auto offer_sdp =
-		std::string(peer_connection->localDescription().value());
-
-#ifdef DEBUG_SDP
-	do_log(LOG_DEBUG, "Offer SDP:\n%s", offer_sdp.c_str());
-#endif
-
-	// Add user-agent to our requests
-	headers = curl_slist_append(headers, user_agent.c_str());
-
-	CURL *c = curl_easy_init();
-	curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, curl_writefunction);
-	curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&read_buffer);
-	curl_easy_setopt(c, CURLOPT_HEADERFUNCTION,
-			 curl_header_location_function);
-	curl_easy_setopt(c, CURLOPT_HEADERDATA, (void *)&location_headers);
-	curl_easy_setopt(c, CURLOPT_HTTPHEADER, headers);
-	curl_easy_setopt(c, CURLOPT_URL, endpoint_url.c_str());
-	curl_easy_setopt(c, CURLOPT_POST, 1L);
-	curl_easy_setopt(c, CURLOPT_COPYPOSTFIELDS, offer_sdp.c_str());
-	curl_easy_setopt(c, CURLOPT_TIMEOUT, 8L);
-	curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
-	curl_easy_setopt(c, CURLOPT_UNRESTRICTED_AUTH, 1L);
-
-	auto cleanup = [&]() {
-		curl_easy_cleanup(c);
-		curl_slist_free_all(headers);
-	};
-
-	CURLcode res = curl_easy_perform(c);
-	if (res != CURLE_OK) {
-		do_log(LOG_ERROR,
-		       "Connect failed: CURL returned result not CURLE_OK");
-		cleanup();
-		obs_output_signal_stop(output, OBS_OUTPUT_CONNECT_FAILED);
-		return false;
-	}
-
-	long response_code;
-	curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &response_code);
-	if (response_code != 201) {
-		do_log(LOG_ERROR,
-		       "Connect failed: HTTP endpoint returned response code %ld",
-		       response_code);
-		cleanup();
-		obs_output_signal_stop(output, OBS_OUTPUT_INVALID_STREAM);
-		return false;
-	}
-
-	if (read_buffer.empty()) {
-		do_log(LOG_ERROR,
-		       "Connect failed: No data returned from HTTP endpoint request");
-		cleanup();
-		obs_output_signal_stop(output, OBS_OUTPUT_CONNECT_FAILED);
-		return false;
-	}
-
-	long redirect_count = 0;
-	curl_easy_getinfo(c, CURLINFO_REDIRECT_COUNT, &redirect_count);
-
-	if (location_headers.size() < static_cast<size_t>(redirect_count) + 1) {
-		do_log(LOG_ERROR,
-		       "WHIP server did not provide a resource URL via the Location header");
-		cleanup();
-		obs_output_signal_stop(output, OBS_OUTPUT_CONNECT_FAILED);
-		return false;
-	}
-
-	CURLU *url_builder = curl_url();
-	auto last_location_header = location_headers.back();
-
-	// If Location header doesn't start with `http` it is a relative URL.
-	// Construct a absolute URL using the host of the effective URL
-	if (last_location_header.find("http") != 0) {
-		char *effective_url = nullptr;
-		curl_easy_getinfo(c, CURLINFO_EFFECTIVE_URL, &effective_url);
-		if (effective_url == nullptr) {
-			do_log(LOG_ERROR, "Failed to build Resource URL");
-			cleanup();
-			obs_output_signal_stop(output,
-					       OBS_OUTPUT_CONNECT_FAILED);
-			return false;
-		}
-
-		curl_url_set(url_builder, CURLUPART_URL, effective_url, 0);
-		curl_url_set(url_builder, CURLUPART_PATH,
-			     last_location_header.c_str(), 0);
-		curl_url_set(url_builder, CURLUPART_QUERY, "", 0);
-	} else {
-		curl_url_set(url_builder, CURLUPART_URL,
-			     last_location_header.c_str(), 0);
-	}
-
-	char *url = nullptr;
-	CURLUcode rc = curl_url_get(url_builder, CURLUPART_URL, &url,
-				    CURLU_NO_DEFAULT_PORT);
-	if (rc) {
-		do_log(LOG_ERROR,
-		       "WHIP server provided a invalid resource URL via the Location header");
-		cleanup();
-		obs_output_signal_stop(output, OBS_OUTPUT_CONNECT_FAILED);
-		return false;
-	}
-
-	resource_url = url;
-	curl_free(url);
-	do_log(LOG_DEBUG, "WHIP Resource URL is: %s", resource_url.c_str());
-	curl_url_cleanup(url_builder);
-
-#ifdef DEBUG_SDP
-	do_log(LOG_DEBUG, "Answer SDP:\n%s", read_buffer.c_str());
-#endif
-
-	auto response = std::string(read_buffer);
-	response.erase(0, response.find("v=0"));
-
-	rtc::Description answer(response, "answer");
-	peer_connection->setRemoteDescription(answer);
-	cleanup();
-	return true;
-}
-
 void WHIPOutput::StartThread()
 {
 	if (!Init())
@@ -397,7 +271,48 @@ void WHIPOutput::StartThread()
 	if (!Setup())
 		return;
 
-	if (!Connect()) {
+	auto status = send_offer(bearer_token, endpoint_url, peer_connection,
+				 resource_url);
+
+	if (status != webrtc_network_status::Success) {
+		if (status == webrtc_network_status::ConnectFailed) {
+			do_log(LOG_ERROR,
+			       "Connect failed: CURL returned result not CURLE_OK");
+			obs_output_signal_stop(output,
+					       OBS_OUTPUT_CONNECT_FAILED);
+		} else if (status ==
+			   webrtc_network_status::InvalidHTTPStatusCode) {
+			do_log(LOG_ERROR,
+			       "Connect failed: HTTP endpoint returned non-201 response code");
+			obs_output_signal_stop(output,
+					       OBS_OUTPUT_INVALID_STREAM);
+
+		} else if (status == webrtc_network_status::NoHTTPData) {
+			do_log(LOG_ERROR,
+			       "Connect failed: No data returned from HTTP endpoint request");
+			obs_output_signal_stop(output,
+					       OBS_OUTPUT_CONNECT_FAILED);
+
+		} else if (status == webrtc_network_status::NoLocationHeader) {
+			do_log(LOG_ERROR,
+			       "WHIP server did not provide a resource URL via the Location header");
+			obs_output_signal_stop(output,
+					       OBS_OUTPUT_CONNECT_FAILED);
+
+		} else if (status ==
+			   webrtc_network_status::FailedToBuildResourceURL) {
+			do_log(LOG_ERROR, "Failed to build Resource URL");
+			obs_output_signal_stop(output,
+					       OBS_OUTPUT_CONNECT_FAILED);
+
+		} else if (status ==
+			   webrtc_network_status::InvalidLocationHeader) {
+			do_log(LOG_ERROR,
+			       "WHIP server provided a invalid resource URL via the Location header");
+			obs_output_signal_stop(output,
+					       OBS_OUTPUT_CONNECT_FAILED);
+		}
+
 		peer_connection->close();
 		peer_connection = nullptr;
 		audio_track = nullptr;
@@ -405,6 +320,7 @@ void WHIPOutput::StartThread()
 		return;
 	}
 
+	do_log(LOG_DEBUG, "WHIP Resource URL is: %s", resource_url.c_str());
 	obs_output_begin_data_capture(output, 0);
 	running = true;
 }
@@ -417,51 +333,17 @@ void WHIPOutput::SendDelete()
 		return;
 	}
 
-	struct curl_slist *headers = NULL;
-	if (!bearer_token.empty()) {
-		auto bearer_token_header =
-			std::string("Authorization: Bearer ") + bearer_token;
-		headers =
-			curl_slist_append(headers, bearer_token_header.c_str());
-	}
-
-	// Add user-agent to our requests
-	headers = curl_slist_append(headers, user_agent.c_str());
-
-	CURL *c = curl_easy_init();
-	curl_easy_setopt(c, CURLOPT_HTTPHEADER, headers);
-	curl_easy_setopt(c, CURLOPT_URL, resource_url.c_str());
-	curl_easy_setopt(c, CURLOPT_CUSTOMREQUEST, "DELETE");
-	curl_easy_setopt(c, CURLOPT_TIMEOUT, 8L);
-
-	auto cleanup = [&]() {
-		curl_easy_cleanup(c);
-		curl_slist_free_all(headers);
-	};
-
-	CURLcode res = curl_easy_perform(c);
-	if (res != CURLE_OK) {
+	auto status = send_delete(bearer_token, resource_url);
+	if (status == webrtc_network_status::Success) {
+		do_log(LOG_DEBUG,
+		       "Successfully performed DELETE request for resource URL");
+		resource_url.clear();
+	} else if (status == webrtc_network_status::DeleteFailed) {
+		do_log(LOG_WARNING, "DELETE request for resource URL failed");
+	} else if (status == webrtc_network_status::InvalidHTTPStatusCode) {
 		do_log(LOG_WARNING,
-		       "DELETE request for resource URL failed. Reason: %s",
-		       curl_easy_strerror(res));
-		cleanup();
-		return;
+		       "DELETE request for resource URL returned non-200 Status Code");
 	}
-
-	long response_code;
-	curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &response_code);
-	if (response_code != 200) {
-		do_log(LOG_WARNING,
-		       "DELETE request for resource URL failed. HTTP Code: %ld",
-		       response_code);
-		cleanup();
-		return;
-	}
-
-	do_log(LOG_DEBUG,
-	       "Successfully performed DELETE request for resource URL");
-	resource_url.clear();
-	cleanup();
 }
 
 void WHIPOutput::StopThread(bool signal)
