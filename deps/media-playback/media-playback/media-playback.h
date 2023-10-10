@@ -18,6 +18,8 @@
 
 #include <obs.h>
 
+#include "libavformat/avio.h"
+
 struct media_playback;
 typedef struct media_playback media_playback_t;
 
@@ -46,6 +48,9 @@ struct mp_media_info {
 	bool reconnecting;
 	bool request_preload;
 	bool full_decode;
+
+	AVIOContext *av_io_context_open;
+	AVIOContext *av_io_context_playback;
 };
 
 extern media_playback_t *
