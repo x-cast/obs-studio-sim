@@ -74,6 +74,8 @@ private:
 
 	AVIOContext *CreateAVIOContextSDP();
 	AVIOContext *CreateAVIOContextRTP();
+	AVIOContext *CreateAudioAVIOContextSDP();
+	AVIOContext *CreateAudioAVIOContextRTP();
 
 	void OnMessageHandler(rtc::binary msg);
 
@@ -91,12 +93,15 @@ private:
 	std::thread start_stop_thread;
 
 	// FFMpeg state
-	bool have_read_session_description;
+	bool have_read_video_session_description;
+	bool have_read_audio_session_description;
 
 	// media-playback
 	media_playback_t *media_video;
+	media_playback_t *media_audio;
 
 	RTPQueue video_queue;
+	RTPQueue audio_queue;
 
 	// TODO - How do you know when a URL + Bearer Token has changed?
 	// `Update` is fired for every character change. We only want to know when the dialog is closed

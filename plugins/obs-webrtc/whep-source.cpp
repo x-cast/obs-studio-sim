@@ -6,12 +6,18 @@
 	     obs_source_get_name(source), ##__VA_ARGS__)
 
 const auto rtp_buff_size = 1500;
-const auto session_description = "v=0\r\n"
+const auto video_session_description = "v=0\r\n"
 				 "o=- 0 0 IN IP4 127.0.0.1\r\n"
 				 "c=IN IP4 127.0.0.1\r\n"
 				 "m=video 5000 RTP/AVP 96\r\n"
 				 "a=rtpmap:96 H264/90000\r\n"
 				 "a=fmtp:96";
+const auto audio_session_description = "v=0\r\n"
+				 "o=- 0 0 IN IP4 127.0.0.1\r\n"
+				 "c=IN IP4 127.0.0.1\r\n"
+				 "m=audio 5000 RTP/AVP 111\r\n"
+				 "a=rtpmap:111 opus/48000/2\r\n"
+				 "a=fmtp:111";
 const auto ffmpeg_options = "sdp_flags=custom_io reorder_queue_size=0";
 
 WHEPSource::WHEPSource(obs_data_t *settings, obs_source_t *source)
@@ -21,9 +27,12 @@ WHEPSource::WHEPSource(obs_data_t *settings, obs_source_t *source)
 	  peer_connection(nullptr),
 	  start_stop_mutex(),
 	  start_stop_thread(),
-	  have_read_session_description(0),
+	  have_read_video_session_description(0),
+	  have_read_audio_session_description(0),
 	  media_video(nullptr),
 	  video_queue(),
+	  media_audio(nullptr),
+	  audio_queue(),
 	  activated(false)
 
 {
@@ -75,19 +84,19 @@ AVIOContext *WHEPSource ::CreateAVIOContextSDP()
 {
 	auto avio_context = avio_alloc_context(
 		reinterpret_cast<unsigned char *>(
-			av_strdup(session_description)),
-		strlen(session_description), 0, this,
+			av_strdup(video_session_description)),
+		strlen(video_session_description), 0, this,
 		[](void *opaque, uint8_t *buf, int buf_size) -> int {
 			auto whep_source = static_cast<WHEPSource *>(opaque);
 
-			if (whep_source->have_read_session_description) {
+			if (whep_source->have_read_video_session_description) {
 				return AVERROR_EOF;
 			}
 
 			strncpy(reinterpret_cast<char *>(buf),
-				session_description, buf_size);
-			whep_source->have_read_session_description = true;
-			return strlen(session_description);
+				video_session_description, buf_size);
+			whep_source->have_read_video_session_description = true;
+			return strlen(video_session_description);
 		},
 		NULL, NULL);
 
@@ -107,9 +116,60 @@ AVIOContext *WHEPSource::CreateAVIOContextRTP()
 			auto whep_source = static_cast<WHEPSource *>(opaque);
 
 			auto video_buff = whep_source->video_queue.pop();
-			std::memcpy(buff, video_buff.data(), video_buff.size());
+			memcpy(buff, video_buff.data(), video_buff.size());
 
 			return video_buff.size();
+		},
+		// Ignore RTCP Packets. Must be set
+		[](void *, uint8_t *, int buf_size) -> int { return buf_size; },
+		NULL);
+
+	if (avio_context == nullptr) {
+		throw std::runtime_error("Failed to create avio_context");
+	}
+
+	return avio_context;
+}
+
+AVIOContext *WHEPSource ::CreateAudioAVIOContextSDP()
+{
+	auto avio_context = avio_alloc_context(
+		reinterpret_cast<unsigned char *>(
+			av_strdup(audio_session_description)),
+		strlen(audio_session_description), 0, this,
+		[](void *opaque, uint8_t *buf, int buf_size) -> int {
+			auto whep_source = static_cast<WHEPSource *>(opaque);
+
+			if (whep_source->have_read_audio_session_description) {
+				return AVERROR_EOF;
+			}
+
+			strncpy(reinterpret_cast<char *>(buf),
+				audio_session_description, buf_size);
+			whep_source->have_read_audio_session_description = true;
+			return strlen(audio_session_description);
+		},
+		NULL, NULL);
+
+	if (avio_context == nullptr) {
+		throw std::runtime_error("Failed to create avio_context");
+	}
+
+	return avio_context;
+}
+
+AVIOContext *WHEPSource::CreateAudioAVIOContextRTP()
+{
+	auto avio_context = avio_alloc_context(
+		static_cast<unsigned char *>(av_malloc(rtp_buff_size)),
+		rtp_buff_size, 1, this,
+		[](void *opaque, uint8_t *buff, int) -> int {
+			auto whep_source = static_cast<WHEPSource *>(opaque);
+
+			auto audio_buff = whep_source->audio_queue.pop();
+			memcpy(buff, audio_buff.data(), audio_buff.size());
+
+			return audio_buff.size();
 		},
 		// Ignore RTCP Packets. Must be set
 		[](void *, uint8_t *, int buf_size) -> int { return buf_size; },
@@ -218,28 +278,47 @@ void WHEPSource::StartThread()
 
 void WHEPSource::SetupDecoding()
 {
-	struct mp_media_info info = {};
+	struct mp_media_info vinfo = {};
+	struct mp_media_info ainfo = {};
 
-	info.opaque = this;
-	info.v_cb = [](void *opaque, struct obs_source_frame *f) {
+	vinfo.opaque = this;
+	vinfo.v_cb = [](void *opaque, struct obs_source_frame *f) {
 		obs_source_output_video(
 			static_cast<WHEPSource *>(opaque)->source, f);
 	};
 
-	info.path = "";
-	info.format = nullptr;
-	info.buffering = 1;
-	info.speed = 100;
-	info.hardware_decoding = false;
-	info.ffmpeg_options = (char *)ffmpeg_options;
-	info.is_local_file = false;
-	info.full_decode = false;
+	vinfo.path = "";
+	vinfo.format = nullptr;
+	vinfo.buffering = 1;
+	vinfo.speed = 100;
+	vinfo.hardware_decoding = false;
+	vinfo.ffmpeg_options = (char *)ffmpeg_options;
+	vinfo.is_local_file = false;
+	vinfo.full_decode = false;
 
-	info.av_io_context_open = CreateAVIOContextSDP();
-	info.av_io_context_playback = CreateAVIOContextRTP();
+	vinfo.av_io_context_open = CreateAVIOContextSDP();
+	vinfo.av_io_context_playback = CreateAVIOContextRTP();
 
-	this->media_video = media_playback_create(&info);
-	media_playback_play(this->media_video, true, true);
+	ainfo.opaque = this;
+	ainfo.a_cb = [](void *opaque, struct obs_source_audio *f) {
+		obs_source_output_audio(
+			static_cast<WHEPSource *>(opaque)->source, f);
+	};
+
+	ainfo.path = "";
+	ainfo.format = nullptr;
+	ainfo.buffering = 1;
+	ainfo.speed = 100;
+	ainfo.hardware_decoding = false;
+	ainfo.ffmpeg_options = (char *)ffmpeg_options;
+	ainfo.is_local_file = false;
+	ainfo.full_decode = false;
+
+	ainfo.av_io_context_open = CreateAudioAVIOContextSDP();
+	ainfo.av_io_context_playback = CreateAudioAVIOContextRTP();
+
+	this->media_audio = media_playback_create(&ainfo);
+	media_playback_play(this->media_audio, true, true);
 }
 
 void register_whep_source()
