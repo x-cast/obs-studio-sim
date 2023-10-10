@@ -720,6 +720,10 @@ static bool init_avformat(mp_media_t *m)
 	}
 
 	m->fmt = avformat_alloc_context();
+
+	m->fmt->probesize = 1500;
+	m->fmt->max_analyze_duration = 1;
+
 	if (m->buffering == 0) {
 		m->fmt->flags |= AVFMT_FLAG_NOBUFFER;
 	}
@@ -727,6 +731,9 @@ static bool init_avformat(mp_media_t *m)
 		av_dict_set(&opts, "stimeout", "30000000", 0);
 		m->fmt->interrupt_callback.callback = interrupt_callback;
 		m->fmt->interrupt_callback.opaque = m;
+	}
+	if (m->av_io_context_open) {
+		m->fmt->pb = m->av_io_context_open;
 	}
 
 	int ret = avformat_open_input(&m->fmt, m->path, format,
@@ -738,6 +745,10 @@ static bool init_avformat(mp_media_t *m)
 			blog(LOG_WARNING, "MP: Failed to open media: '%s'",
 			     m->path);
 		return false;
+	}
+
+	if (m->av_io_context_playback) {
+		m->fmt->pb = m->av_io_context_playback;
 	}
 
 	if (avformat_find_stream_info(m->fmt, NULL) < 0) {
@@ -901,6 +912,8 @@ static inline bool mp_media_init_internal(mp_media_t *m,
 	m->path = info->path ? bstrdup(info->path) : NULL;
 	m->format_name = info->format ? bstrdup(info->format) : NULL;
 	m->hw = info->hardware_decoding;
+	m->av_io_context_open = info->av_io_context_open;
+	m->av_io_context_playback = info->av_io_context_playback;
 
 	if (info->full_decode)
 		return true;
