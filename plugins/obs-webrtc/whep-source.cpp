@@ -36,11 +36,7 @@ WHEPSource::WHEPSource(obs_data_t *settings, obs_source_t *source)
 	  running(false),
 	  start_stop_mutex(),
 	  start_stop_thread(),
-	  media_video(nullptr),
-	  media_audio(nullptr),
-	  last_frame(std::chrono::system_clock::now()),
-	  video_queue(),
-	  audio_queue()
+	  last_frame(std::chrono::system_clock::now())
 {
 	Update(settings);
 }
@@ -48,15 +44,6 @@ WHEPSource::WHEPSource(obs_data_t *settings, obs_source_t *source)
 WHEPSource::~WHEPSource()
 {
 	running = false;
-
-	if (media_audio) {
-		media_playback_destroy(media_audio);
-		media_audio = nullptr;
-	}
-	if (media_video) {
-		media_playback_destroy(media_video);
-		media_video = nullptr;
-	}
 
 	Stop();
 
@@ -139,28 +126,23 @@ void WHEPSource::Update(obs_data_t *settings)
 	start_stop_thread = std::thread(&WHEPSource::StartThread, this);
 }
 
-AVIOContext *WHEPSource::CreateAVIOContextVideo()
+AVCodecContext *WHEPSource::CreateVideoAVCodecDecoder()
 {
-	auto avio_context = avio_alloc_context(
-		static_cast<unsigned char *>(av_malloc(buff_size_video)),
-		buff_size_video, 0, this,
-		[](void *opaque, uint8_t *buff, int) -> int {
-			auto whep_source = static_cast<WHEPSource *>(opaque);
-
-			auto video_buff = whep_source->video_queue.pop();
-			memcpy(buff, video_buff.data(), video_buff.size());
-
-			return static_cast<int>(video_buff.size());
-		},
-		nullptr, nullptr);
-
-	avio_context->direct = 1;
-
-	if (avio_context == nullptr) {
-		throw std::runtime_error("Failed to create avio_context");
+	const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+	if (!codec) {
+		throw std::runtime_error("Failed to find H264 codec");
 	}
 
-	return avio_context;
+	AVCodecContext *codec_context = avcodec_alloc_context3(codec);
+	if (!codec_context) {
+		throw std::runtime_error("Failed to allocate codec context");
+	}
+
+	if (avcodec_open2(codec_context, codec, nullptr) < 0) {
+		throw std::runtime_error("Failed to open codec");
+	}
+
+	return codec_context;
 }
 
 void WHEPSource::DepacketizeH264()
@@ -175,7 +157,7 @@ void WHEPSource::DepacketizeH264()
 		auto h264_nalu = h264_nalu_header();
 		std::copy(pkt.begin() + headerSize, pkt.end(),
 			  std::back_inserter(h264_nalu));
-		this->video_queue.push(h264_nalu);
+		this->DecodeH264(h264_nalu);
 	} else if (naluType == naluTypeSTAPA) {
 		auto currOffset = stapaHeaderSize + headerSize;
 		while (currOffset < pkt.size()) {
@@ -196,7 +178,7 @@ void WHEPSource::DepacketizeH264()
 				  std::back_inserter(h264_nalu));
 			currOffset += naluSize;
 
-			this->video_queue.push(h264_nalu);
+			this->DecodeH264(h264_nalu);
 		}
 	} else if (naluType == naluTypeFUA) {
 		if (fua_buffer.size() == 0) {
@@ -215,12 +197,51 @@ void WHEPSource::DepacketizeH264()
 
 			fua_buffer[4] = naluRefIdc | fragmentedNaluType;
 
-			this->video_queue.push(fua_buffer);
+			this->DecodeH264(fua_buffer);
 			fua_buffer = std::vector<std::byte>{};
 		}
 	} else {
 		throw std::runtime_error("Unknown H264 RTP Packetization");
 	}
+}
+
+void WHEPSource::DecodeH264(std::vector<std::byte> &h264_nalu)
+{
+	AVPacket *pkt = this->av_packet.get();
+
+	pkt->data = reinterpret_cast<uint8_t *>(h264_nalu.data());
+	pkt->size = h264_nalu.size();
+
+	auto ret = avcodec_send_packet(this->video_av_codec_context.get(), pkt);
+	if (ret < 0) {
+		throw std::runtime_error("Error sending packet to decoder");
+	}
+
+	AVFrame *frame = this->av_frame.get();
+
+	while(true) {
+		ret = avcodec_receive_frame(this->video_av_codec_context.get(), frame);
+		if (ret < 0) {
+			if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+				break;
+			}
+			throw std::runtime_error("Error receiving frame from decoder");
+		}
+
+		struct obs_source_frame frame_data = {};
+		frame_data.format = VIDEO_FORMAT_I420;
+		frame_data.width = frame->width;
+		frame_data.height = frame->height;
+		frame_data.linesize[0] = frame->linesize[0];
+		frame_data.linesize[1] = frame->linesize[1];
+		frame_data.linesize[2] = frame->linesize[2];
+		frame_data.data[0] = frame->data[0];
+		frame_data.data[1] = frame->data[1];
+		frame_data.data[2] = frame->data[2];
+
+		obs_source_output_video(this->source, &frame_data);
+	}
+
 }
 
 void WHEPSource::OnMessageHandler(rtc::binary msg)
@@ -357,40 +378,20 @@ void WHEPSource::StartThread()
 
 void WHEPSource::SetupDecoding()
 {
-	struct mp_media_info info = {};
-
-	info.opaque = this;
-	info.v_cb = [](void *opaque, struct obs_source_frame *f) {
-		auto whep_source = static_cast<WHEPSource *>(opaque);
-		whep_source->last_frame = std::chrono::system_clock::now();
-
-		obs_source_output_video(whep_source->source, f);
-	};
-	info.a_cb = [](void *opaque, struct obs_source_audio *f) {
-		obs_source_output_audio(
-			static_cast<WHEPSource *>(opaque)->source, f);
-	};
-
-	info.path = "";
-	info.format = nullptr;
-	info.buffering = 0;
-	info.speed = 100;
-	info.hardware_decoding = true;
-	info.ffmpeg_options = (char *)ffmpeg_options;
-	info.is_local_file = false;
-	info.full_decode = false;
-
-	info.av_io_context_open = CreateAVIOContextVideo();
-
-	this->media_video = media_playback_create(&info);
-	media_playback_play(this->media_video, true, true);
-
-	// TODO
-	// info.av_io_context_open = CreateAudioAVIOContextSDP();
-	// info.av_io_context_playback = CreateAudioAVIOContextRTP();
-
-	// this->media_audio = media_playback_create(&info);
-	// media_playback_play(this->media_audio, true, true);
+	this->video_av_codec_context = std::shared_ptr<AVCodecContext>(
+		this->CreateVideoAVCodecDecoder(),
+		[](AVCodecContext *ctx) { avcodec_free_context(&ctx); });
+	// init avpacket and avframe
+	this->av_packet = std::shared_ptr<AVPacket>(av_packet_alloc(),
+						    [](AVPacket *pkt) {
+							    av_packet_free(
+								    &pkt);
+						    });
+	this->av_frame = std::shared_ptr<AVFrame>(av_frame_alloc(),
+						  [](AVFrame *frame) {
+							  av_frame_free(
+								  &frame);
+						  });
 }
 
 void WHEPSource::MaybeSendPLI()

@@ -18,7 +18,6 @@ extern "C" {
 #include "libavformat/avio.h"
 #include "libavutil/mem.h"
 #include "libavutil/mathematics.h"
-#include <media-playback/media-playback.h>
 }
 
 #include "../obs-ffmpeg/obs-ffmpeg-compat.h"
@@ -77,8 +76,9 @@ private:
 	void Stop();
 	void StopThread();
 	void DepacketizeH264();
+	void DecodeH264(std::vector<std::byte>& pkt);
 
-	AVIOContext *CreateAVIOContextVideo();
+	AVCodecContext *CreateVideoAVCodecDecoder();
 
 	void OnMessageHandler(rtc::binary msg);
 
@@ -92,16 +92,13 @@ private:
 	std::shared_ptr<rtc::Track> audio_track;
 	std::shared_ptr<rtc::Track> video_track;
 
+	std::shared_ptr<AVCodecContext> video_av_codec_context;
+	std::shared_ptr<AVPacket> av_packet;
+	std::shared_ptr<AVFrame> av_frame;
+
 	std::atomic<bool> running;
 	std::mutex start_stop_mutex;
 	std::thread start_stop_thread;
-
-	// media-playback
-	media_playback_t *media_video;
-	media_playback_t *media_audio;
-
-	RTPQueue video_queue;
-	RTPQueue audio_queue;
 
 	std::vector<std::vector<std::byte>> rtp_pkts_video;
 	std::vector<std::byte> fua_buffer;
