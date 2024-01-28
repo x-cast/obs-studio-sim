@@ -548,6 +548,10 @@ void SimpleOutput::LoadStreamingPreset_Lossy(const char *encoderId)
 	if (!videoStreaming)
 		throw "Failed to create video streaming encoder (simple output)";
 	obs_encoder_release(videoStreaming);
+
+	if (config_get_bool(main->Config(), "Stream1", "UseSimulcast")) {
+		CreateSimulcastEncoders(encoderId);
+	}
 }
 
 /* mistakes have been made to lead us to this. */
@@ -845,9 +849,14 @@ void SimpleOutput::Update()
 	default:
 		obs_encoder_set_preferred_video_format(videoStreaming,
 						       VIDEO_FORMAT_NV12);
+		for (auto enc : simulcastEncoders)
+			obs_encoder_set_preferred_video_format(
+				enc, VIDEO_FORMAT_NV12);
 	}
 
 	obs_encoder_update(videoStreaming, videoSettings);
+	ConfigureSimulcastEncoders(videoSettings, videoBitrate);
+
 	obs_encoder_update(audioStreaming, audioSettings);
 	obs_encoder_update(audioArchive, audioSettings);
 }
@@ -1049,6 +1058,9 @@ inline void SimpleOutput::SetupOutputs()
 {
 	SimpleOutput::Update();
 	obs_encoder_set_video(videoStreaming, obs_get_video());
+	for (auto enc : simulcastEncoders)
+		obs_encoder_set_video(enc, obs_get_video());
+
 	obs_encoder_set_audio(audioStreaming, obs_get_audio());
 	obs_encoder_set_audio(audioArchive, obs_get_audio());
 	int tracks =
@@ -1145,7 +1157,11 @@ bool SimpleOutput::SetupStreaming(obs_service_t *service)
 		outputType = type;
 	}
 
-	obs_output_set_video_encoder(streamOutput, videoStreaming);
+	obs_output_set_video_encoder2(streamOutput, videoStreaming, 0);
+	for (size_t i = 0; i < simulcastEncoders.size(); i++)
+		obs_output_set_video_encoder2(streamOutput,
+					      simulcastEncoders[i], i + 1);
+
 	obs_output_set_audio_encoder(streamOutput, audioStreaming, 0);
 	obs_output_set_service(streamOutput, service);
 	return true;
@@ -1649,6 +1665,10 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 		      "(advanced output)";
 	obs_encoder_release(videoStreaming);
 
+	if (config_get_bool(main->Config(), "Stream1", "UseSimulcast")) {
+		CreateSimulcastEncoders(streamEncoder);
+	}
+
 	const char *rate_control = obs_data_get_string(
 		useStreamEncoder ? streamEncSettings : recordEncSettings,
 		"rate_control");
@@ -1769,6 +1789,8 @@ void AdvancedOutput::UpdateStreamSettings()
 	}
 
 	obs_encoder_update(videoStreaming, settings);
+	ConfigureSimulcastEncoders(settings,
+				   obs_data_get_int(settings, "bitrate"));
 }
 
 inline void AdvancedOutput::UpdateRecordingSettings()
@@ -2113,6 +2135,9 @@ inline void AdvancedOutput::UpdateAudioSettings()
 void AdvancedOutput::SetupOutputs()
 {
 	obs_encoder_set_video(videoStreaming, obs_get_video());
+	for (auto enc : simulcastEncoders)
+		obs_encoder_set_video(enc, obs_get_video());
+
 	if (videoRecording)
 		obs_encoder_set_video(videoRecording, obs_get_video());
 	for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
@@ -2229,7 +2254,11 @@ bool AdvancedOutput::SetupStreaming(obs_service_t *service)
 		outputType = type;
 	}
 
-	obs_output_set_video_encoder(streamOutput, videoStreaming);
+	obs_output_set_video_encoder2(streamOutput, videoStreaming, 0);
+	for (size_t i = 0; i < simulcastEncoders.size(); i++)
+		obs_output_set_video_encoder2(streamOutput,
+					      simulcastEncoders[i], i + 1);
+
 	if (!is_multitrack_output) {
 		obs_output_set_audio_encoder(streamOutput, streamAudioEnc, 0);
 	} else {
@@ -2553,6 +2582,56 @@ std::string BasicOutputHandler::GetRecordingFilename(
 		GetOutputFilename(path, container, noSpace, overwrite, format);
 	lastRecordingPath = dst;
 	return dst;
+}
+
+void BasicOutputHandler::CreateSimulcastEncoders(const char *encoderId)
+{
+	std::string encoder_name = "simulcast_0";
+	for (auto i = 0; i < 2; i++) {
+		encoder_name[encoder_name.size() - 1] = to_string(i).at(0);
+		auto simulcast_encoder = obs_video_encoder_create(
+			encoderId, encoder_name.c_str(), nullptr, nullptr);
+
+		if (simulcast_encoder) {
+			simulcastEncoders.push_back(simulcast_encoder);
+			obs_encoder_release(simulcast_encoder);
+		} else {
+			blog(LOG_WARNING,
+			     "Failed to create video streaming simulcast encoders (simple output)");
+		}
+	}
+}
+
+void BasicOutputHandler::ConfigureSimulcastEncoders(obs_data_t *videoSettings,
+						    int videoBitrate)
+{
+	video_t *video = obs_get_video();
+
+	if (simulcastEncoders.size() > 0) {
+		uint32_t width = video_output_get_width(video) / 1.5;
+		width -= width % 2;
+
+		uint32_t height = video_output_get_height(video) / 1.5;
+		height -= height % 2;
+
+		obs_data_set_int(videoSettings, "bitrate", videoBitrate / 2);
+		obs_encoder_update(simulcastEncoders[0], videoSettings);
+		obs_encoder_set_scaled_size(simulcastEncoders[0], width,
+					    height);
+	}
+
+	if (simulcastEncoders.size() > 1) {
+		uint32_t width = video_output_get_width(video) / 2;
+		width -= width % 2;
+
+		uint32_t height = video_output_get_height(video) / 2;
+		height -= height % 2;
+
+		obs_data_set_int(videoSettings, "bitrate", videoBitrate / 4);
+		obs_encoder_update(simulcastEncoders[1], videoSettings);
+		obs_encoder_set_scaled_size(simulcastEncoders[1], width,
+					    height);
+	}
 }
 
 BasicOutputHandler *CreateSimpleOutputHandler(OBSBasic *main)

@@ -94,6 +94,8 @@ void OBSBasicSettings::LoadStream1Settings()
 {
 	bool ignoreRecommended =
 		config_get_bool(main->Config(), "Stream1", "IgnoreRecommended");
+	bool useSimulcast =
+		config_get_bool(main->Config(), "Stream1", "UseSimulcast");
 
 	obs_service_t *service_obj = main->GetService();
 	const char *type = obs_service_get_type(service_obj);
@@ -157,10 +159,13 @@ void OBSBasicSettings::LoadStream1Settings()
 		ui->server->setCurrentIndex(idx);
 	}
 
-	if (is_whip)
+	if (is_whip) {
 		ui->key->setText(bearer_token);
-	else
+		ui->useSimulcast->show();
+	} else {
 		ui->key->setText(key);
+		ui->useSimulcast->hide();
+	}
 
 	ServiceChanged(true);
 
@@ -173,6 +178,7 @@ void OBSBasicSettings::LoadStream1Settings()
 	ui->streamPage->setEnabled(!streamActive);
 
 	ui->ignoreRecommended->setChecked(ignoreRecommended);
+	ui->useSimulcast->setChecked(useSimulcast);
 
 	loading = false;
 
@@ -286,6 +292,7 @@ void OBSBasicSettings::SaveStream1Settings()
 	}
 
 	SaveCheckBox(ui->ignoreRecommended, "Stream1", "IgnoreRecommended");
+	SaveCheckBox(ui->useSimulcast, "Stream1", "UseSimulcast");
 	SwapMultiTrack(QT_TO_UTF8(protocol));
 }
 
@@ -538,6 +545,12 @@ void OBSBasicSettings::on_service_currentIndexChanged(int idx)
 			ui->streamSingleTracks);
 	} else {
 		SwapMultiTrack(QT_TO_UTF8(protocol));
+	}
+
+	if (IsWHIP()) {
+		ui->useSimulcast->show();
+	} else {
+		ui->useSimulcast->hide();
 	}
 }
 

@@ -21,6 +21,8 @@ struct BasicOutputHandler {
 	obs_scene_t *vCamSourceScene = nullptr;
 	obs_sceneitem_t *vCamSourceSceneItem = nullptr;
 
+	std::vector<OBSEncoder> simulcastEncoders;
+
 	std::string outputType;
 	std::string lastError;
 
@@ -79,6 +81,10 @@ protected:
 					 const char *container, bool noSpace,
 					 bool overwrite, const char *format,
 					 bool ffmpeg);
+
+	void CreateSimulcastEncoders(const char *encoderId);
+	void ConfigureSimulcastEncoders(obs_data_t *videoSettings,
+					int videoBitrate);
 };
 
 BasicOutputHandler *CreateSimpleOutputHandler(OBSBasic *main);

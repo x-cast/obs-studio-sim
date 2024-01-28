@@ -21,6 +21,14 @@ const uint8_t audio_payload_type = 111;
 const char *video_mid = "1";
 const uint8_t video_payload_type = 96;
 
+const std::string rtpHeaderExtUriMid = "urn:ietf:params:rtp-hdrext:sdes:mid";
+const std::string rtpHeaderExtUriRid =
+	"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id";
+
+const std::string highRid = "h";
+const std::string medRid = "m";
+const std::string lowRid = "l";
+
 WHIPOutput::WHIPOutput(obs_data_t *, obs_output_t *output)
 	: output(output),
 	  is_av1(false),
@@ -37,8 +45,7 @@ WHIPOutput::WHIPOutput(obs_data_t *, obs_output_t *output)
 	  total_bytes_sent(0),
 	  connect_time_ms(0),
 	  start_time_ns(0),
-	  last_audio_timestamp(0),
-	  last_video_timestamp(0)
+	  last_audio_timestamp(0)
 {
 }
 
@@ -60,7 +67,28 @@ bool WHIPOutput::Start()
 		return false;
 	}
 
-	is_av1 = (strcmp("av1", obs_encoder_get_codec(encoder)) == 0);
+	for (size_t idx = 0; idx < 5; idx++) {
+		auto encoder = obs_output_get_video_encoder2(output, idx);
+		if (encoder == nullptr) {
+			break;
+		}
+
+		is_av1 = (strcmp("av1", obs_encoder_get_codec(encoder)) == 0);
+
+		auto v = std::make_shared<videoLayerState>();
+		if (idx == 0) {
+			v->ssrc = base_ssrc + 1;
+			v->rid = highRid;
+		} else if (idx == 1) {
+			v->ssrc = base_ssrc + 2;
+			v->rid = medRid;
+		} else if (idx == 2) {
+			v->ssrc = base_ssrc + 3;
+			v->rid = lowRid;
+		}
+
+		videoLayerStates[obs_encoder_get_width(encoder)] = v;
+	}
 
 	if (!obs_output_can_begin_data_capture(output, 0))
 		return false;
@@ -97,10 +125,28 @@ void WHIPOutput::Data(struct encoder_packet *packet)
 		     audio_sr_reporter);
 		last_audio_timestamp = packet->dts_usec;
 	} else if (packet->type == OBS_ENCODER_VIDEO) {
-		int64_t duration = packet->dts_usec - last_video_timestamp;
+		auto rtp_config = video_sr_reporter->rtpConfig;
+		auto videoLayerState =
+			videoLayerStates[obs_encoder_get_width(packet->encoder)];
+		if (videoLayerState == nullptr) {
+			Stop(false);
+			obs_output_signal_stop(output, OBS_OUTPUT_ENCODE_ERROR);
+			return;
+		}
+
+		rtp_config->sequenceNumber = videoLayerState->sequenceNumber;
+		rtp_config->ssrc = videoLayerState->ssrc;
+		rtp_config->rid = videoLayerState->rid;
+		rtp_config->timestamp = videoLayerState->rtpTimestamp;
+		int64_t duration =
+			packet->dts_usec - videoLayerState->lastVideoTimestamp;
+
 		Send(packet->data, packet->size, duration, video_track,
 		     video_sr_reporter);
-		last_video_timestamp = packet->dts_usec;
+
+		videoLayerState->sequenceNumber = rtp_config->sequenceNumber;
+		videoLayerState->lastVideoTimestamp = packet->dts_usec;
+		videoLayerState->rtpTimestamp = rtp_config->timestamp;
 	}
 }
 
@@ -144,9 +190,26 @@ void WHIPOutput::ConfigureVideoTrack(std::string media_stream_id,
 	video_description.addSSRC(ssrc, cname, media_stream_id,
 				  media_stream_track_id);
 
+	video_description.addExtMap(
+		rtc::Description::Entry::ExtMap(1, rtpHeaderExtUriMid));
+	video_description.addExtMap(
+		rtc::Description::Entry::ExtMap(2, rtpHeaderExtUriRid));
+
+	if (videoLayerStates.size() >= 2) {
+		for (auto i = videoLayerStates.rbegin();
+		     i != videoLayerStates.rend(); i++) {
+			video_description.addRid(i->second->rid);
+		}
+	}
+
+	video_track = peer_connection->addTrack(video_description);
+
 	auto rtp_config = std::make_shared<rtc::RtpPacketizationConfig>(
 		ssrc, cname, video_payload_type,
 		rtc::H264RtpPacketizer::defaultClockRate);
+	rtp_config->midId = 1;
+	rtp_config->ridId = 2;
+	rtp_config->mid = video_mid;
 
 	if (is_av1) {
 		video_description.addAV1Codec(video_payload_type);
@@ -513,7 +576,7 @@ void WHIPOutput::StopThread(bool signal)
 	connect_time_ms = 0;
 	start_time_ns = 0;
 	last_audio_timestamp = 0;
-	last_video_timestamp = 0;
+	videoLayerStates.clear();
 }
 
 void WHIPOutput::Send(void *data, uintptr_t size, uint64_t duration,
@@ -560,7 +623,8 @@ void register_whip_output()
 	struct obs_output_info info = {};
 
 	info.id = "whip_output";
-	info.flags = OBS_OUTPUT_AV | OBS_OUTPUT_ENCODED | OBS_OUTPUT_SERVICE;
+	info.flags = OBS_OUTPUT_AV | OBS_OUTPUT_ENCODED | OBS_OUTPUT_SERVICE |
+		     OBS_OUTPUT_MULTI_TRACK_AV;
 	info.get_name = [](void *) -> const char * {
 		return obs_module_text("Output.Name");
 	};
