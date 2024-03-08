@@ -2587,7 +2587,7 @@ std::string BasicOutputHandler::GetRecordingFilename(
 void BasicOutputHandler::CreateSimulcastEncoders(const char *encoderId)
 {
 	std::string encoder_name = "simulcast_0";
-	for (auto i = 0; i < 2; i++) {
+	for (auto i = 0; i < 1; i++) {
 		encoder_name[encoder_name.size() - 1] = to_string(i).at(0);
 		auto simulcast_encoder = obs_video_encoder_create(
 			encoderId, encoder_name.c_str(), nullptr, nullptr);
